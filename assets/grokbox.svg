@@ -58,7 +58,7 @@
   <rect x="110" y="80" width="10" height="10" fill="#0C0C0F" class="b b0"/>
   <rect x="130" y="80" width="10" height="10" fill="#0C0C0F" class="b b0"/>
   <rect x="130" y="110" width="20" height="10" fill="#7FD1C0" class="b b0"/>
-  <rect x="130" y="120" width="10" height="10" fill="#7FD1C0" class="b b0"/>
+  <rect x="140" y="120" width="10" height="10" fill="#7FD1C0" class="b b0"/>
   <rect x="280" y="30" width="70" height="10" fill="#E8785C" class="b b1"/>
   <rect x="270" y="40" width="90" height="10" fill="#E8785C" class="b b1"/>
   <rect x="270" y="50" width="90" height="10" fill="#E8785C" class="b b1"/>
@@ -78,7 +78,7 @@
   <rect x="510" y="80" width="10" height="10" fill="#0C0C0F" class="b b2"/>
   <rect x="530" y="80" width="10" height="10" fill="#0C0C0F" class="b b2"/>
   <rect x="480" y="110" width="20" height="10" fill="#8FA9F5" class="b b2"/>
-  <rect x="490" y="120" width="10" height="10" fill="#8FA9F5" class="b b2"/>
+  <rect x="480" y="120" width="10" height="10" fill="#8FA9F5" class="b b2"/>
   <rect x="120" y="390" width="30" height="10" fill="#EDEDF2"/>
   <rect x="110" y="400" width="10" height="10" fill="#EDEDF2"/>
   <rect x="150" y="400" width="10" height="10" fill="#EDEDF2"/>
