@@ -1,0 +1,13 @@
+# build output
+/bin/
+/dist/
+grokbox
+
+# local state
+*.jsonl
+*.log
+
+# os / editor junk
+.DS_Store
+.idea/
+.vscode/
