@@ -541,8 +541,9 @@ func mentions(text, name string) bool {
 // ------------------------------------------------------------------- colour
 
 // palette holds 256-colour codes that stay legible on both dark and light
-// terminals.
-var palette = []int{39, 42, 45, 75, 78, 111, 114, 141, 147, 150, 173, 176, 179, 208, 210, 213}
+// terminals, spread across hues so two names in the same room rarely land on
+// the same colour family.
+var palette = []int{39, 45, 78, 81, 111, 141, 147, 150, 170, 173, 179, 203, 208, 210, 213, 220}
 
 func (t *chat) color(seed, s string) string {
 	if !t.opts.Color {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -117,7 +118,8 @@ func cmdSend(ctx context.Context, args []string) error {
 func cmdRead(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("read", flag.ContinueOnError)
 	since := fs.Int64("since", -1, "start after this sequence number (default: where this machine left off)")
-	wait := fs.Duration("wait", 0, "if there is nothing new, wait up to this long for something (max 60s)")
+	var wait patience
+	fs.Var(&wait, "wait", "if there is nothing new, wait up to this long for something (max 60s)")
 	limit := fs.Int("limit", 200, "print at most this many messages")
 	asJSON := fs.Bool("json", false, "one JSON object per line")
 	noTime := fs.Bool("no-time", false, "hide timestamps")
@@ -141,10 +143,7 @@ func cmdRead(ctx context.Context, args []string) error {
 	}
 	defer s.save()
 
-	if *wait > 60*time.Second {
-		*wait = 60 * time.Second
-	}
-	fresh, err := s.cl.Poll(ctx, *wait)
+	fresh, err := s.cl.Poll(ctx, wait.clamped())
 	if err != nil {
 		return err
 	}
@@ -369,6 +368,42 @@ func joinHint(err error) error {
 		return fmt.Errorf("%s — try again once someone leaves", ae.Msg)
 	}
 	return err
+}
+
+// patience is a --wait value. It takes a duration, and also a bare number,
+// because "--wait 25" is what everyone types.
+type patience time.Duration
+
+func (p *patience) String() string {
+	if *p == 0 {
+		return "0s"
+	}
+	return time.Duration(*p).String()
+}
+
+func (p *patience) Set(v string) error {
+	if d, err := time.ParseDuration(v); err == nil {
+		*p = patience(d)
+		return nil
+	}
+	secs, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return fmt.Errorf("%q is not a duration: try 25s", v)
+	}
+	*p = patience(time.Duration(secs * float64(time.Second)))
+	return nil
+}
+
+// clamped keeps the wait inside what the server will honour.
+func (p *patience) clamped() time.Duration {
+	d := time.Duration(*p)
+	if d < 0 {
+		return 0
+	}
+	if d > 60*time.Second {
+		return 60 * time.Second
+	}
+	return d
 }
 
 func usageFor(fs *flag.FlagSet, name, blurb string) func() {
