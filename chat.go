@@ -89,7 +89,7 @@ func cmdSend(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := s.cl.Resume(ctx); err != nil {
+	if _, err := s.cl.Resume(ctx); err != nil {
 		return joinHint(err)
 	}
 	defer s.save()
@@ -131,17 +131,9 @@ func cmdRead(ctx context.Context, args []string) error {
 		return err
 	}
 
-	var msgs []proto.Message
-	if s.resumed {
-		if err := s.cl.Resume(ctx); err != nil {
-			return joinHint(err)
-		}
-	} else {
-		jr, err := s.cl.Join(ctx)
-		if err != nil {
-			return joinHint(err)
-		}
-		msgs = jr.History // first visit: hand over the backlog for context
+	msgs, err := s.connect(ctx)
+	if err != nil {
+		return err
 	}
 	if *since >= 0 {
 		s.cl.SetSeq(*since)
@@ -187,17 +179,9 @@ func cmdTail(ctx context.Context, args []string) error {
 		return err
 	}
 
-	var backlog []proto.Message
-	if s.resumed {
-		if err := s.cl.Resume(ctx); err != nil {
-			return joinHint(err)
-		}
-	} else {
-		jr, err := s.cl.Join(ctx)
-		if err != nil {
-			return joinHint(err)
-		}
-		backlog = jr.History
+	backlog, err := s.connect(ctx)
+	if err != nil {
+		return err
 	}
 	if *since >= 0 {
 		s.cl.SetSeq(*since)
@@ -248,7 +232,7 @@ func cmdMembers(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := s.cl.Resume(ctx); err != nil {
+	if _, err := s.cl.Resume(ctx); err != nil {
 		return joinHint(err)
 	}
 	defer s.save()
@@ -297,6 +281,33 @@ func cmdLeave(ctx context.Context, args []string) error {
 }
 
 // ------------------------------------------------------------------ helpers
+
+// connect makes sure the session is live and returns the backlog to print
+// before anything new. A session that was still valid has no backlog: we have
+// already seen everything up to our cursor.
+func (s *session) connect(ctx context.Context) ([]proto.Message, error) {
+	saved := s.cl.Seq()
+	jr, err := s.cl.Resume(ctx)
+	if err != nil {
+		return nil, joinHint(err)
+	}
+	if jr == nil {
+		return nil, nil
+	}
+	if !s.resumed || jr.Seq < saved {
+		// First visit here, or the room's counter went backwards because the
+		// server was restarted without its transcript. Take the lot.
+		return jr.History, nil
+	}
+	// The session expired and we re-joined: print only what we missed.
+	missed := make([]proto.Message, 0, len(jr.History))
+	for _, m := range jr.History {
+		if m.Seq > saved {
+			missed = append(missed, m)
+		}
+	}
+	return missed, nil
+}
 
 func writeMessage(w io.Writer, m proto.Message, asJSON, clock bool) error {
 	if asJSON {

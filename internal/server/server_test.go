@@ -330,3 +330,45 @@ func TestFollowWhileSpeaking(t *testing.T) {
 		}
 	}
 }
+
+// TestResumeAfterAnExpiredSessionReturnsTheBacklog covers the case a polling
+// client hits after being away: its token is gone, so it re-joins, and the
+// messages it missed have to come back with that join or they are lost.
+func TestResumeAfterAnExpiredSessionReturnsTheBacklog(t *testing.T) {
+	ctx := context.Background()
+	_, in := newTestServer(t, server.Config{})
+
+	alice := join(t, in, "alice")
+	bob := join(t, in, "bob")
+	bob.Poll(ctx, 0)
+	away := bob.Seq()
+
+	if _, err := alice.Say(ctx, "said while bob was away"); err != nil {
+		t.Fatalf("say: %v", err)
+	}
+
+	// Bob drops off, then comes back holding a token the server has forgotten
+	// — which is what a saved session looks like after it has timed out.
+	if err := bob.Leave(ctx); err != nil {
+		t.Fatalf("leave: %v", err)
+	}
+	bob.SetToken("lounge~this-token-is-no-longer-valid")
+	bob.SetSeq(away)
+	resp, err := bob.Resume(ctx)
+	if err != nil {
+		t.Fatalf("resume: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("Resume reported a live session for a token the server never issued")
+	}
+
+	var missed []string
+	for _, m := range resp.History {
+		if m.Seq > away && m.Kind == proto.KindChat {
+			missed = append(missed, m.Text)
+		}
+	}
+	if len(missed) != 1 || missed[0] != "said while bob was away" {
+		t.Fatalf("re-join returned %v, want the one message bob missed", missed)
+	}
+}

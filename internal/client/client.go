@@ -112,15 +112,16 @@ func (c *Client) SetToken(tok string) {
 }
 
 // Resume makes sure there is a usable session, reusing a restored token when
-// the server still honours it and joining afresh when it does not.
-func (c *Client) Resume(ctx context.Context) error {
+// the server still honours it and joining afresh when it does not. It returns
+// the join response when it had to re-join — the caller owns the backlog that
+// comes with it — and nil when the old session was still good.
+func (c *Client) Resume(ctx context.Context) (*proto.JoinResponse, error) {
 	if c.Joined() {
 		if _, err := c.Members(ctx); err == nil {
-			return nil
+			return nil, nil
 		}
 	}
-	_, err := c.Join(ctx)
-	return err
+	return c.Join(ctx)
 }
 
 // Join authenticates with the room key and claims the display name. The
@@ -177,6 +178,12 @@ func (c *Client) Poll(ctx context.Context, wait time.Duration) ([]proto.Message,
 	var out proto.MessagesResponse
 	if err := c.do(ctx, http.MethodGet, path, nil, &out, true); err != nil {
 		return nil, err
+	}
+	// A room whose latest sequence number sits behind our cursor has been
+	// restarted without its transcript, so the cursor points at nothing that
+	// will ever exist. Rewind rather than going silent forever.
+	if out.Seq < c.Seq() {
+		c.SetSeq(0)
 	}
 	for _, m := range out.Messages {
 		c.advance(m.Seq)

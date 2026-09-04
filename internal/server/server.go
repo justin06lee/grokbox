@@ -248,7 +248,16 @@ type discard struct{}
 func (discard) Write(p []byte) (int, error) { return len(p), nil }
 
 func (s *Server) janitor(ctx context.Context) {
-	t := time.NewTicker(15 * time.Second)
+	// Sweep often enough that a short idle timeout means what it says, but
+	// never faster than once a second.
+	every := s.cfg.Idle / 3
+	if every > 15*time.Second {
+		every = 15 * time.Second
+	}
+	if every < time.Second {
+		every = time.Second
+	}
+	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
 		select {
