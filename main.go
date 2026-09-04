@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"syscall"
 
@@ -19,8 +20,28 @@ import (
 	"github.com/justin06lee/grokbox/internal/server"
 )
 
-// version is stamped at build time (see the Makefile).
-var version = "dev"
+// version is stamped at build time by the Makefile. A `go install` build has
+// no ldflags, so it reads its version from the module's build info instead.
+var version = ""
+
+func resolveVersion() string {
+	if version != "" {
+		return version
+	}
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "dev"
+	}
+	if v := bi.Main.Version; v != "" && v != "(devel)" {
+		return v
+	}
+	for _, s := range bi.Settings {
+		if s.Key == "vcs.revision" && len(s.Value) >= 7 {
+			return s.Value[:7]
+		}
+	}
+	return "dev"
+}
 
 const usage = `grokbox — a chat room behind a key.
 
@@ -54,6 +75,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	version = resolveVersion()
 	client.UserAgent = "grokbox/" + version
 	server.Build = version
 
