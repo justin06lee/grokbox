@@ -48,6 +48,38 @@ func (s *store) transcriptPath(room string) string {
 
 func (s *store) roomsPath() string { return filepath.Join(s.dir, "rooms.json") }
 
+func (s *store) serverPath() string { return filepath.Join(s.dir, "server.json") }
+
+// serverInfo is what a room's invite needs beyond the room itself. It is
+// written down so the invites can be reprinted later without the server
+// running — on a machine you only reach over ssh, the alternative is digging
+// them out of the log.
+type serverInfo struct {
+	BaseURL     string `json:"base_url"`
+	Fingerprint string `json:"fingerprint,omitempty"`
+}
+
+func (s *store) saveServerInfo(i serverInfo) error {
+	b, err := json.MarshalIndent(i, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := s.serverPath() + ".tmp"
+	if err := os.WriteFile(tmp, append(b, '\n'), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, s.serverPath())
+}
+
+func (s *store) loadServerInfo() (serverInfo, error) {
+	var i serverInfo
+	b, err := os.ReadFile(s.serverPath())
+	if err != nil {
+		return i, err
+	}
+	return i, json.Unmarshal(b, &i)
+}
+
 // loadRooms returns the rooms this store has seen, with their keys.
 func (s *store) loadRooms() ([]roomRecord, error) {
 	b, err := os.ReadFile(s.roomsPath())

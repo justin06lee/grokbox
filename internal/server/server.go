@@ -5,6 +5,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,9 +41,16 @@ type Config struct {
 	History   int           // messages retained (and replayed) per room
 	Idle      time.Duration // drop a member unheard from for this long
 	Advertise string        // public base URL to put in invites
-	TLSCert   string
-	TLSKey    string
-	Logf      func(string, ...any)
+
+	// TLS serves HTTPS. With no certificate supplied the server signs its
+	// own and puts the hash of it in every invite, which is what lets a room
+	// on a bare IP be private without anybody owning a domain. Turn it off
+	// only when something in front of the server is already terminating TLS.
+	TLS     bool
+	TLSCert string
+	TLSKey  string
+
+	Logf func(string, ...any)
 }
 
 // Server hosts a set of rooms over HTTP.
@@ -50,6 +58,11 @@ type Server struct {
 	cfg     Config
 	store   *store
 	started time.Time
+
+	host        string // what goes in invites
+	reach       Reach
+	cert        *tls.Certificate
+	fingerprint string
 
 	mu    sync.RWMutex
 	rooms map[string]*Room
@@ -69,6 +82,10 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	s := &Server{cfg: cfg, rooms: map[string]*Room{}, started: time.Now()}
+	s.resolveHost()
+	if err := s.setupTLS(); err != nil {
+		return nil, err
+	}
 
 	if cfg.StoreDir != "" {
 		st, err := openStore(cfg.StoreDir)
@@ -125,7 +142,42 @@ func New(cfg Config) (*Server, error) {
 	if err := s.persistRooms(); err != nil {
 		return nil, err
 	}
+	if s.store != nil {
+		if err := s.store.saveServerInfo(serverInfo{BaseURL: s.BaseURL(), Fingerprint: s.fingerprint}); err != nil {
+			cfg.Logf("warn  cannot record the server address: %v", err)
+		}
+	}
 	return s, nil
+}
+
+// StoredInvites rebuilds the invite for every room in a server's store,
+// without starting anything. It is how you get the code again on a machine
+// where the server is running as a service and its startup output is gone.
+func StoredInvites(dir string) ([]proto.Invite, error) {
+	st, err := openStore(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer st.Close()
+
+	info, err := st.loadServerInfo()
+	if err != nil {
+		return nil, fmt.Errorf("%s does not look like a grokbox server store: %w", dir, err)
+	}
+	rooms, err := st.loadRooms()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]proto.Invite, 0, len(rooms))
+	for _, r := range rooms {
+		out = append(out, proto.Invite{
+			Server:      info.BaseURL,
+			Room:        r.Name,
+			Key:         r.Key,
+			Fingerprint: info.Fingerprint,
+		})
+	}
+	return out, nil
 }
 
 func (s *Server) newRoom(name, key string) *Room {
@@ -148,6 +200,67 @@ func (s *Server) persistRooms() error {
 	s.mu.RUnlock()
 	return s.store.saveRooms(recs)
 }
+
+// resolveHost works out, once, what address invites should point at.
+func (s *Server) resolveHost() {
+	if s.cfg.Advertise != "" {
+		s.host, s.reach = hostOf(s.cfg.Advertise), ReachAdvertised
+		return
+	}
+	// An explicit listen host is a decision already made; only a wildcard
+	// leaves the question open.
+	if host, _ := splitAddr(s.cfg.Addr); host != "" && host != "0.0.0.0" && host != "::" && host != "[::]" {
+		s.host, s.reach = host, ReachLocal
+		if ip := net.ParseIP(host); ip != nil && isGloballyRoutable(ip) {
+			s.reach = ReachPublic
+		}
+		return
+	}
+	s.host, s.reach = publicHost()
+}
+
+// setupTLS loads or mints the certificate this server presents.
+func (s *Server) setupTLS() error {
+	if !s.cfg.TLS {
+		return nil
+	}
+	if s.cfg.TLSCert != "" && s.cfg.TLSKey != "" {
+		cert, err := tls.LoadX509KeyPair(s.cfg.TLSCert, s.cfg.TLSKey)
+		if err != nil {
+			return fmt.Errorf("cannot load the certificate: %w", err)
+		}
+		// A certificate with an authority behind it verifies the ordinary
+		// way, so the invite says nothing about it.
+		s.cert = &cert
+		return nil
+	}
+	cert, fingerprint, err := selfSigned(s.cfg.StoreDir, certHosts(s.host))
+	if err != nil {
+		return err
+	}
+	s.cert, s.fingerprint = &cert, fingerprint
+	return nil
+}
+
+// TLSConfig is what this server presents, or nil when it is serving plain
+// HTTP. It is exported so the handler can be mounted in somebody else's
+// server without losing the certificate that its invites pin.
+func (s *Server) TLSConfig() *tls.Config {
+	if s.cert == nil {
+		return nil
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{*s.cert},
+		MinVersion:   tls.VersionTLS12,
+	}
+}
+
+// Reach reports how far the advertised address goes.
+func (s *Server) Reach() Reach { return s.reach }
+
+// Fingerprint is the hash of a self-signed certificate, or empty when the
+// server presents one that verifies on its own.
+func (s *Server) Fingerprint() string { return s.fingerprint }
 
 // Rooms lists the hosted rooms, alphabetically.
 func (s *Server) Rooms() []*Room {
@@ -172,23 +285,25 @@ func (s *Server) BaseURL() string {
 	if s.cfg.Advertise != "" {
 		return normalizeBase(s.cfg.Advertise, s.tls())
 	}
-	host, port := splitAddr(s.cfg.Addr)
-	if host == "" || host == "0.0.0.0" || host == "::" || host == "[::]" {
-		host = LocalIP()
-	}
+	_, port := splitAddr(s.cfg.Addr)
 	scheme := "http"
 	if s.tls() {
 		scheme = "https"
 	}
-	return fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(host, port))
+	return fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(s.host, port))
 }
 
 // Invite renders the shareable code for one room.
 func (s *Server) Invite(room *Room) proto.Invite {
-	return proto.Invite{Server: s.BaseURL(), Room: room.Name(), Key: room.Key()}
+	return proto.Invite{
+		Server:      s.BaseURL(),
+		Room:        room.Name(),
+		Key:         room.Key(),
+		Fingerprint: s.fingerprint,
+	}
 }
 
-func (s *Server) tls() bool { return s.cfg.TLSCert != "" && s.cfg.TLSKey != "" }
+func (s *Server) tls() bool { return s.cert != nil }
 
 // Handler returns the HTTP routes.
 func (s *Server) Handler() http.Handler {
@@ -219,11 +334,12 @@ func (s *Server) Run(ctx context.Context) error {
 
 	errc := make(chan error, 1)
 	go func() {
-		if s.tls() {
-			errc <- srv.ListenAndServeTLS(s.cfg.TLSCert, s.cfg.TLSKey)
-		} else {
-			errc <- srv.ListenAndServe()
+		if cfg := s.TLSConfig(); cfg != nil {
+			srv.TLSConfig = cfg
+			errc <- srv.ListenAndServeTLS("", "")
+			return
 		}
+		errc <- srv.ListenAndServe()
 	}()
 
 	select {

@@ -5,6 +5,8 @@ package proto
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -101,10 +103,28 @@ type Error struct {
 }
 
 // Invite packs everything a newcomer needs into one shareable string.
+//
+// Fingerprint is what makes a room on a bare IP safe to join. A server with no
+// certificate authority behind it signs its own, and the invite carries the
+// hash of it — so the client knows which certificate to expect before it ever
+// connects, which is a stronger position than the usual one of trusting
+// whatever a stranger presents on first contact.
 type Invite struct {
-	Server string `json:"s"` // base URL, e.g. https://chat.example.com
-	Room   string `json:"r"`
-	Key    string `json:"k"`
+	Server      string `json:"s"` // base URL, e.g. https://chat.example.com
+	Room        string `json:"r"`
+	Key         string `json:"k"`
+	Fingerprint string `json:"f,omitempty"`
+}
+
+// Fingerprint hashes a certificate in its DER encoding.
+func Fingerprint(der []byte) string {
+	sum := sha256.Sum256(der)
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+// SameFingerprint compares two fingerprints without leaking where they differ.
+func SameFingerprint(a, b string) bool {
+	return len(a) == len(b) && subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
 const invitePrefix = "grokbox1-"

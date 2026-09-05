@@ -46,7 +46,8 @@ func cmdServe(ctx context.Context, args []string) error {
 	history := fs.Int("history", 200, "messages kept and replayed per room")
 	idle := fs.Duration("idle", 90*time.Second, "drop a member unheard from for this long")
 	advertise := fs.String("advertise", os.Getenv("GROKBOX_ADVERTISE"), "public base URL to put in invites, e.g. https://chat.example.com")
-	cert := fs.String("tls-cert", "", "TLS certificate file")
+	useTLS := fs.Bool("tls", true, "serve HTTPS; pass --tls=false only when something in front of this already terminates it")
+	cert := fs.String("tls-cert", "", "TLS certificate file (default: sign one and pin it in the invite)")
 	tlsKey := fs.String("tls-key", "", "TLS key file")
 	quiet := fs.Bool("quiet", false, "only log errors")
 	fs.Usage = func() {
@@ -84,6 +85,7 @@ func cmdServe(ctx context.Context, args []string) error {
 		History:   *history,
 		Idle:      *idle,
 		Advertise: *advertise,
+		TLS:       *useTLS,
 		TLSCert:   *cert,
 		TLSKey:    *tlsKey,
 		Logf:      logf,
@@ -101,26 +103,84 @@ func cmdServe(ctx context.Context, args []string) error {
 func printServeBanner(srv *server.Server, addr, store string, open bool) {
 	out := os.Stderr
 	fmt.Fprintf(out, "\ngrokbox %s — listening on %s\n", version, addr)
-	fmt.Fprintf(out, "reachable at %s\n", srv.BaseURL())
+	fmt.Fprintf(out, "reachable at %s   %s\n", srv.BaseURL(), reachNote(srv.Reach()))
 
 	for _, r := range srv.Rooms() {
 		fmt.Fprintf(out, "\n  room    %s\n  key     %s\n  invite  %s\n", r.Name(), r.Key(), srv.Invite(r).Encode())
 	}
 
 	if first := srv.Rooms(); len(first) > 0 {
-		fmt.Fprintf(out, "\n  hand out the invite, then everyone runs:\n\n      grokbox join %s --name <their-name>\n", srv.Invite(first[0]).Encode())
+		fmt.Fprintf(out, "\n  hand out the invite, then everyone runs:\n\n      grokbox join %s --name <their-name>\n\n", srv.Invite(first[0]).Encode())
+	}
+
+	switch {
+	case srv.Fingerprint() != "":
+		fmt.Fprintf(out, "  tls     self-signed, pinned by the invite (%s)\n", srv.Fingerprint())
+	case strings.HasPrefix(srv.BaseURL(), "https://"):
+		fmt.Fprintf(out, "  tls     on\n")
+	default:
+		fmt.Fprintf(out, "  tls     off — the room key crosses the network in the clear\n")
 	}
 	if store != "" {
-		fmt.Fprintf(out, "\n  store   %s\n", store)
+		fmt.Fprintf(out, "  store   %s\n", store)
 	} else {
-		fmt.Fprintf(out, "\n  store   (memory only — keys change on restart)\n")
+		fmt.Fprintf(out, "  store   (memory only — keys and the certificate change on restart)\n")
 	}
 	if open {
 		fmt.Fprintf(out, "  open    joiners may create new rooms\n")
 	}
-	fmt.Fprintf(out, "\n  the address above is only reachable from this network. To let people\n")
-	fmt.Fprintf(out, "  outside it in, put the port behind a tunnel or a public host and pass\n")
-	fmt.Fprintf(out, "  --advertise <that URL>.\n\n  ctrl-c to stop\n\n")
+
+	if srv.Reach() == server.ReachLocal {
+		fmt.Fprintf(out, "\n  that address only works on this network. To let people outside it in,\n")
+		fmt.Fprintf(out, "  run this where it has a public address, or put the port behind a tunnel\n")
+		fmt.Fprintf(out, "  and pass --advertise <that URL>.\n")
+	}
+	fmt.Fprintf(out, "\n  ctrl-c to stop\n\n")
+}
+
+// reachNote says how far the advertised address actually goes, because an
+// invite that only works on one wifi network and an invite that works from
+// anywhere look exactly alike.
+func reachNote(r server.Reach) string {
+	switch r {
+	case server.ReachPublic:
+		return "(public — anyone with the invite can reach it)"
+	case server.ReachLocal:
+		return "(this network only)"
+	default:
+		return "(as advertised)"
+	}
+}
+
+// cmdRooms reprints the invites a server store holds.
+func cmdRooms(args []string) error {
+	fs := flag.NewFlagSet("rooms", flag.ContinueOnError)
+	store := fs.String("store", filepath.Join(client.UserDir(), "server"), "the server's store directory")
+	codes := fs.Bool("codes", false, "print only the invite codes, one per line")
+	fs.Usage = func() {
+		fmt.Fprint(os.Stderr, "usage: grokbox rooms [flags]\n\nprint the invite for every room a server holds, without starting it.\nUse this to get a code again on a machine where grokbox runs as a service.\n\nflags:\n")
+		fs.PrintDefaults()
+	}
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	invites, err := server.StoredInvites(*store)
+	if err != nil {
+		return err
+	}
+	if len(invites) == 0 {
+		fmt.Fprintln(os.Stderr, "no rooms in "+*store)
+		return nil
+	}
+	for _, in := range invites {
+		if *codes {
+			fmt.Println(in.Encode())
+			continue
+		}
+		fmt.Printf("room    %s\nkey     %s\ninvite  %s\n\n", in.Room, in.Key, in.Encode())
+	}
+	return nil
 }
 
 func envOr(name, def string) string {

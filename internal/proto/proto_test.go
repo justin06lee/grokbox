@@ -89,3 +89,46 @@ func TestNewKeyIsReadableAndUnique(t *testing.T) {
 		seen[k] = true
 	}
 }
+
+func TestInviteCarriesTheFingerprint(t *testing.T) {
+	in := Invite{
+		Server:      "https://203.0.113.9:7777",
+		Room:        "lounge",
+		Key:         "abcd-efgh-ijkl-mnop",
+		Fingerprint: Fingerprint([]byte("a certificate")),
+	}
+	got, err := ParseInvite(in.Encode())
+	if err != nil {
+		t.Fatalf("ParseInvite: %v", err)
+	}
+	if got != in {
+		t.Fatalf("round trip lost something: %+v != %+v", got, in)
+	}
+
+	// An invite for a server with a real certificate carries no fingerprint,
+	// and must still decode.
+	plain := Invite{Server: "https://chat.example.com", Room: "lounge", Key: "k"}
+	if got, err := ParseInvite(plain.Encode()); err != nil || got.Fingerprint != "" {
+		t.Fatalf("ParseInvite(plain) = %+v, %v", got, err)
+	}
+}
+
+func TestFingerprint(t *testing.T) {
+	a := Fingerprint([]byte("one certificate"))
+	b := Fingerprint([]byte("another certificate"))
+	if a == b {
+		t.Fatal("two different certificates hashed the same")
+	}
+	if a != Fingerprint([]byte("one certificate")) {
+		t.Fatal("hashing the same certificate twice gave two answers")
+	}
+	if len(a) != 43 { // 32 bytes, base64url, unpadded
+		t.Fatalf("fingerprint is %d characters: %q", len(a), a)
+	}
+	if !SameFingerprint(a, a) {
+		t.Error("SameFingerprint said a fingerprint differs from itself")
+	}
+	if SameFingerprint(a, b) || SameFingerprint(a, "") || SameFingerprint(a, a[:len(a)-1]) {
+		t.Error("SameFingerprint accepted a mismatch")
+	}
+}
