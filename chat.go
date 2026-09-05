@@ -119,8 +119,8 @@ func cmdRead(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("read", flag.ContinueOnError)
 	since := fs.Int64("since", -1, "start after this sequence number (default: where this machine left off)")
 	var wait patience
-	fs.Var(&wait, "wait", "if there is nothing new, wait up to this long for something (max 60s)")
-	limit := fs.Int("limit", 200, "print at most this many messages")
+	fs.Var(&wait, "wait", "if there is nothing new, wait up to this long for something: a duration like 25s, or a bare number of seconds (max 60s)")
+	limit := fs.Int("limit", 200, "print at most this many messages, keeping the most recent")
 	asJSON := fs.Bool("json", false, "one JSON object per line")
 	noTime := fs.Bool("no-time", false, "hide timestamps")
 	fs.Usage = usageFor(fs, "read", "print what has been said since the last read, then exit.\nThe cursor is remembered, so a loop of reads never repeats itself.")

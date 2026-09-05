@@ -38,15 +38,16 @@ anywhere:
 make
 ```
 
-For people who would rather not install Go, `make dist` cross-compiles
-binaries for macOS, Linux and Windows into `./dist`.
+For people who would rather not install Go, `make dist` cross-compiles binaries
+for macOS, Linux and Windows into `./dist`; `gh release create v0.2.0 dist/*`
+puts them where others can download them.
 
 ## Host a room
 
 ```console
 $ grokbox serve
 
-grokbox v0.1.2 — listening on :7777
+grokbox v0.2.0 — listening on :7777
 reachable at https://203.0.113.9:7777   (public — anyone with the invite can reach it)
 
   room    lounge
@@ -58,7 +59,7 @@ reachable at https://203.0.113.9:7777   (public — anyone with the invite can r
       grokbox join grokbox1-eyJzIjoiaHR0cHM6Ly8yMDMuMC4xMTMu… --name <their-name>
 
   tls     self-signed, pinned by the invite (xqCkVZng6zxPfflLSNs7hdazyVr0CgZ5lG49EXcryzY)
-  store   /var/lib/grokbox/server
+  store   ~/.config/grokbox/server
 ```
 
 The invite code carries the address, the room name, the key and the certificate
@@ -79,11 +80,13 @@ Useful flags:
 |---|---|
 | `--addr :7777` | Address to listen on. |
 | `--room lounge` | Room to host. Repeat it for several rooms; `--room lounge=my-key` sets the key yourself. |
+| `--key KEY` | The key for the first room, instead of a generated one. |
 | `--advertise URL` | The address to put in invites, when the server sits behind a proxy or a name. |
 | `--open` | Let joiners create rooms that do not exist yet; the first one in sets the key. |
 | `--store ""` | Keep everything in memory, so keys and history vanish on exit. |
 | `--history 200` | Messages retained and replayed per room. |
 | `--idle 90s` | How long a member can go unheard from before the room drops them. |
+| `--quiet` | Print nothing but errors — no banner, no join log. |
 | `--tls-cert / --tls-key` | Use a real certificate instead of a self-signed one. Invites then pin nothing, because it verifies on its own. |
 | `--tls=false` | Serve plain HTTP. Only when something in front is already terminating TLS. |
 
@@ -124,9 +127,13 @@ signs a certificate, and prints an invite that anyone can use from anywhere.
 To keep it running after you close the ssh session, and after a reboot:
 
 ```bash
-make service                   # installs a systemd unit, Linux
-grokbox rooms --store /var/lib/grokbox/server    # the invites, any time later
+make service                    # installs a systemd unit, Linux
+sudo grokbox rooms --store /var/lib/grokbox/server   # the invites, any time later
+journalctl -u grokbox -f        # its log
 ```
+
+`sudo` on that second one because the service runs under a systemd
+`DynamicUser`, which owns its state directory.
 
 Settings for the service live in `/etc/grokbox.env` — `GROKBOX_ADDR`,
 `GROKBOX_ADVERTISE`, `GROKBOX_ROOM`.
@@ -193,14 +200,15 @@ The repo ships a skill teaching all of this — including how to behave in a roo
 with other people in it — at [`skills/grokbox/SKILL.md`](skills/grokbox/SKILL.md):
 
 ```bash
-bmo add justin06lee/grokbox/skills/grokbox        # or copy the folder into your skills dir
+bmo add justin06lee/grokbox/skills/grokbox grok       # or claude, codex, cursor, …
+bmo add justin06lee/grokbox/skills/grokbox everyone   # every harness on the machine
 ```
+
+Or copy `skills/grokbox/` into whatever directory your agent reads skills from.
 
 ## Commands
 
 ```
-grokbox serve   [flags]                     host rooms and print their invites
-grokbox rooms   [flags]                     reprint a server's invites, without starting it
 grokbox join    [invite] --name NAME        open the interactive chat
 grokbox send    [invite] --name NAME TEXT   say one thing and exit
 grokbox read    [invite] --name NAME        print what has been said since last time
@@ -209,18 +217,30 @@ grokbox members [invite] --name NAME        list who is in the room
 grokbox invite  [invite] [--decode]         show or decode an invite code
 grokbox health  [invite]                    check that a server is up
 grokbox leave   [invite]                    end this machine's session
+
+grokbox serve   [flags]                     host rooms and print their invites
+grokbox rooms   [flags]                     reprint a server's invites, without starting it
 grokbox version
 ```
 
-Every client command takes the invite code as its first argument; leave it out
+Every command in the first group takes the invite code as its first argument; leave it out
 and the last room this machine joined is used. `--server`, `--room` and `--key`
-spell out the same thing the long way, and `GROKBOX_INVITE`, `GROKBOX_NAME`,
-`GROKBOX_SERVER`, `GROKBOX_ROOM` and `GROKBOX_KEY` set them from the
-environment. `--no-save` keeps a room out of the config file entirely.
+spell out the same thing the long way — but an invite rebuilt from parts has no
+certificate hash in it, so prefer the code itself. `--no-save` keeps a room out
+of the config file entirely.
+
+Everything can come from the environment instead:
+
+| | |
+|---|---|
+| `GROKBOX_INVITE`, `GROKBOX_NAME` | Which room, and who you are in it. |
+| `GROKBOX_SERVER`, `GROKBOX_ROOM`, `GROKBOX_KEY` | The long way round. |
+| `GROKBOX_ADDR`, `GROKBOX_ADVERTISE` | For `serve`. |
+| `GROKBOX_HOME` | Where grokbox keeps everything, client and server alike. |
 
 ## How it works
 
-The server is plain HTTP with a JSON body on every route.
+The server speaks HTTPS, with a JSON body on every route.
 
 | Route | |
 |---|---|
@@ -236,12 +256,17 @@ the room they belong to, and presenting an old token with a join reclaims that
 name — so a client that was cut off comes straight back instead of waiting out
 the idle timeout.
 
-Connections are HTTPS unless you turn that off. A room that does not exist
-answers exactly like a wrong key, so the server cannot be used to enumerate the
-rooms it hosts. Message text has its control
-characters stripped before anyone else sees it, because a chat line is not
-allowed to repaint somebody else's terminal. Members are rate-limited to about
-one message a second with a burst of ten.
+Nothing streams over WebSocket, deliberately: server-sent events and a long
+poll are both ordinary HTTP requests, so a room works through any proxy that
+can forward one.
+
+A room that does not exist answers exactly like a wrong key, so the server
+cannot be used to enumerate the rooms it hosts, and keys are compared in
+constant time. Message text has its control characters stripped before anyone
+else sees it, because a chat line is not allowed to repaint somebody else's
+terminal. Members are rate-limited to about one message a second with a burst
+of ten, a room holds at most 64 of them, and a session that goes unheard from
+for 90 seconds is dropped.
 
 ## What it keeps on disk
 
@@ -259,17 +284,24 @@ several independent members on one machine.
 ## Development
 
 ```bash
-make test     # go test ./...
-make race     # the same, with the race detector
-make          # build, install, verify
-make update   # stop a running server, reinstall, start it again
-make service  # run it under systemd, surviving reboots (Linux)
+make            # build, install to $PATH, verify it runs from anywhere
+make build      # just the binary, into ./bin
+make install    # just the install step
+make update     # stop a running server, reinstall, start it again
+make service    # run it under systemd, surviving reboots (Linux)
+make unservice  # remove that unit again
+make test       # go test ./...
+make race       # the same, with the race detector
+make fmt vet    # gofmt -w, go vet
+make dist       # cross-compiled binaries into ./dist
+make clean      # remove bin and dist
 ```
 
-The code is four small packages: `internal/proto` (the wire format and the
-invite codec), `internal/server` (rooms, keys, persistence), `internal/client`
-(the HTTP client) and `internal/ui` (the terminal chat window). Nothing outside
-the standard library except `golang.org/x/term`, for raw mode.
+The code is four small packages: `internal/proto` (the wire format, the invite
+codec and the fingerprint), `internal/server` (rooms, keys, certificates,
+persistence), `internal/client` (the HTTP client and the certificate pinning)
+and `internal/ui` (the terminal chat window). Nothing outside the standard
+library except `golang.org/x/term`, for raw mode.
 
 ## License
 

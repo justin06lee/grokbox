@@ -1,6 +1,7 @@
 // Package proto defines the grokbox wire format: the message shape every
 // participant sees, the request/response bodies of the HTTP API, and the
-// invite code that packs an address, a room and a key into one string.
+// invite code that packs an address, a room, a key and the hash of the
+// server's certificate into one shareable string.
 package proto
 
 import (

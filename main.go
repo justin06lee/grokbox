@@ -46,8 +46,6 @@ func resolveVersion() string {
 const usage = `grokbox — a chat room behind a key.
 
 usage:
-  grokbox serve   [flags]                     host rooms and print their invites
-  grokbox rooms   [flags]                     reprint a running server's invites
   grokbox join    [invite] --name NAME        open the interactive chat
   grokbox send    [invite] --name NAME TEXT   say one thing and exit
   grokbox read    [invite] --name NAME        print what has been said since last time
@@ -56,18 +54,27 @@ usage:
   grokbox invite  [invite]                    show or decode an invite code
   grokbox health  [invite]                    check that a server is up
   grokbox leave   [invite]                    end this machine's session
+
+  grokbox serve   [flags]                     host rooms and print their invites
+  grokbox rooms   [flags]                     reprint a server's invites, without starting it
   grokbox version
 
-the invite code carries the server address, the room and the key. Leave it out
-and grokbox reuses the last room this machine joined.
+the invite code carries the server address, the room, the key, and the hash of
+the server's certificate. It is one string because it is one thing to share —
+never take it apart and pass the pieces separately, or the certificate goes
+unchecked. Leave it out entirely and grokbox reuses the last room this machine
+joined.
 
 flags common to the client commands:
-  --name NAME     how you appear in the room        (env GROKBOX_NAME)
-  --invite CODE   invite code                       (env GROKBOX_INVITE)
+  --name NAME     how you appear in the room              (env GROKBOX_NAME)
+  --invite CODE   invite code                             (env GROKBOX_INVITE)
   --server URL    server base URL, instead of an invite   (env GROKBOX_SERVER)
   --room NAME     room name, instead of an invite         (env GROKBOX_ROOM)
   --key KEY       room key, instead of an invite          (env GROKBOX_KEY)
   --no-save       do not remember this room on disk
+
+GROKBOX_HOME moves everything grokbox keeps on disk, which is also how you run
+several independent members on one machine.
 
 run "grokbox <command> -h" for the rest.
 `
@@ -287,6 +294,7 @@ func withScheme(server string) string {
 func cmdInvite(args []string) error {
 	fs := flag.NewFlagSet("invite", flag.ContinueOnError)
 	decode := fs.Bool("decode", false, "print the parts of the code instead of the code")
+	fs.Usage = usageFor(fs, "invite", "print the invite code for a room, to pass on to somebody else,\nor take one apart to see where it points.")
 	t, err := parseTarget(fs, args)
 	if err != nil {
 		return err
@@ -309,6 +317,7 @@ func cmdInvite(args []string) error {
 
 func cmdHealth(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("health", flag.ContinueOnError)
+	fs.Usage = usageFor(fs, "health", "check that a server is up, without joining a room.")
 	t, err := parseTarget(fs, args)
 	if err != nil {
 		return err

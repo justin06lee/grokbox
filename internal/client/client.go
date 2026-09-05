@@ -1,5 +1,9 @@
 // Package client talks to a grokbox server: join a room with a key, send
 // lines, and follow everything anyone else says.
+//
+// When the invite names a certificate, the client pins it and will talk to
+// nothing else — which is what lets a room on a bare IP be reached privately,
+// with no certificate authority in the picture.
 package client
 
 import (

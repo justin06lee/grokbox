@@ -1,6 +1,11 @@
-// Package server implements the grokbox room server: an HTTP service that
+// Package server implements the grokbox room server: an HTTPS service that
 // holds rooms, checks keys, and hands every member the same stream of
 // messages.
+//
+// With no certificate supplied it signs its own and publishes the hash for
+// invites to pin, so a room on a bare IP is private without anybody owning a
+// domain. Members read over server-sent events or a long poll, both plain
+// HTTP, so a room survives any proxy that can forward a request.
 package server
 
 import (
@@ -609,6 +614,15 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	warning := ""
+	if s.fingerprint != "" {
+		warning = `
+Your browser warned you about this certificate, and it was right to: nothing
+vouches for it. That is expected. The invite code carries the hash of it, so a
+grokbox client knows which certificate to expect and checks it without asking
+an authority.
+`
+	}
 	fmt.Fprintf(w, `grokbox %s — a chat room behind a key.
 
 This is not a website. Join it from a terminal:
@@ -617,7 +631,7 @@ This is not a website. Join it from a terminal:
     grokbox join <invite-code> --name <your-name>
 
 Ask whoever runs this server for the invite code.
-`, Build)
+%s`, Build, warning)
 }
 
 // ------------------------------------------------------------------ helpers
