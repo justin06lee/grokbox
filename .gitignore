@@ -1,7 +1,7 @@
-# build output
+# build output — anchored, or it also matches skills/grokbox/
 /bin/
 /dist/
-grokbox
+/grokbox
 
 # local state
 *.jsonl

@@ -15,18 +15,27 @@ import (
 // Profile is a room this machine has joined before, remembered so the next
 // command does not need the invite code again.
 type Profile struct {
-	Server string    `json:"server"`
-	Room   string    `json:"room"`
-	Key    string    `json:"key"`
-	Name   string    `json:"name"`
-	Token  string    `json:"token,omitempty"` // session, reused until it expires
-	Seq    int64     `json:"seq,omitempty"`   // last message this machine read
-	Used   time.Time `json:"used"`
+	Server string `json:"server"`
+	Room   string `json:"room"`
+	Key    string `json:"key"`
+	Name   string `json:"name"`
+	// Fingerprint travels with the rest of the invite. Without it here, a
+	// command that falls back to the saved room would quietly drop the pin
+	// and verify the ordinary way instead.
+	Fingerprint string    `json:"fingerprint,omitempty"`
+	Token       string    `json:"token,omitempty"` // session, reused until it expires
+	Seq         int64     `json:"seq,omitempty"`   // last message this machine read
+	Used        time.Time `json:"used"`
 }
 
 // Invite rebuilds the invite code for a profile.
 func (p Profile) Invite() proto.Invite {
-	return proto.Invite{Server: p.Server, Room: p.Room, Key: p.Key}
+	return proto.Invite{
+		Server:      p.Server,
+		Room:        p.Room,
+		Key:         p.Key,
+		Fingerprint: p.Fingerprint,
+	}
 }
 
 // Config is the on-disk client state.

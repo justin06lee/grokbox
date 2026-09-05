@@ -372,3 +372,98 @@ func TestResumeAfterAnExpiredSessionReturnsTheBacklog(t *testing.T) {
 		t.Fatalf("re-join returned %v, want the one message bob missed", missed)
 	}
 }
+
+// newTLSServer starts a server that signed its own certificate, and returns
+// the invite that pins it.
+func newTLSServer(t *testing.T, dir string) (*server.Server, proto.Invite) {
+	t.Helper()
+	srv, err := server.New(server.Config{
+		Rooms:    []server.RoomSpec{{Name: "lounge", Key: "open-sesame"}},
+		TLS:      true,
+		StoreDir: dir,
+		Logf:     func(string, ...any) {},
+	})
+	if err != nil {
+		t.Fatalf("server.New: %v", err)
+	}
+	ts := httptest.NewUnstartedServer(srv.Handler())
+	ts.TLS = srv.TLSConfig()
+	ts.StartTLS()
+	t.Cleanup(ts.Close)
+
+	return srv, proto.Invite{
+		Server:      ts.URL,
+		Room:        "lounge",
+		Key:         "open-sesame",
+		Fingerprint: srv.Fingerprint(),
+	}
+}
+
+func TestSelfSignedServerIsReachedByPinningIt(t *testing.T) {
+	ctx := context.Background()
+	srv, in := newTLSServer(t, t.TempDir())
+
+	if srv.Fingerprint() == "" {
+		t.Fatal("a self-signed server published no fingerprint, so no invite could pin it")
+	}
+	if !strings.HasPrefix(in.Server, "https://") {
+		t.Fatalf("server is at %s, want https", in.Server)
+	}
+
+	alice := client.New(in, "alice")
+	if _, err := alice.Join(ctx); err != nil {
+		t.Fatalf("a client holding the fingerprint could not join: %v", err)
+	}
+	if _, err := alice.Say(ctx, "over TLS"); err != nil {
+		t.Fatalf("say: %v", err)
+	}
+}
+
+func TestWrongFingerprintIsRefused(t *testing.T) {
+	ctx := context.Background()
+	_, in := newTLSServer(t, t.TempDir())
+
+	impostor := in
+	impostor.Fingerprint = strings.Repeat("A", len(in.Fingerprint))
+	if _, err := client.New(impostor, "mallory").Join(ctx); err == nil {
+		t.Fatal("a client accepted a certificate its invite did not name")
+	}
+}
+
+func TestUnpinnedClientWillNotTrustASelfSignedServer(t *testing.T) {
+	ctx := context.Background()
+	_, in := newTLSServer(t, t.TempDir())
+
+	// An invite that lost its fingerprint must fail closed, not fall back to
+	// verifying the ordinary way and then accepting whatever turns up.
+	bare := in
+	bare.Fingerprint = ""
+	if _, err := client.New(bare, "alice").Join(ctx); err == nil {
+		t.Fatal("a client with no fingerprint trusted a self-signed server")
+	}
+}
+
+func TestCertificateSurvivesARestart(t *testing.T) {
+	dir := t.TempDir()
+	first, in := newTLSServer(t, dir)
+	second, err := server.New(server.Config{TLS: true, StoreDir: dir, Logf: func(string, ...any) {}})
+	if err != nil {
+		t.Fatalf("restart: %v", err)
+	}
+	if first.Fingerprint() != second.Fingerprint() {
+		t.Fatal("the certificate changed across a restart, so every invite already handed out is dead")
+	}
+	if in.Fingerprint != second.Fingerprint() {
+		t.Fatal("the restarted server does not match the invite the first one printed")
+	}
+}
+
+func TestPlainHTTPServerPublishesNoFingerprint(t *testing.T) {
+	srv, _ := newTestServer(t, server.Config{})
+	if srv.Fingerprint() != "" {
+		t.Fatal("a plain HTTP server published a fingerprint for invites to pin")
+	}
+	if srv.TLSConfig() != nil {
+		t.Fatal("a plain HTTP server built a TLS config")
+	}
+}

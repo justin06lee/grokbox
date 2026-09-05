@@ -4,6 +4,7 @@
 #   make build    just produce ./bin/grokbox
 #   make install  put grokbox on $PATH
 #   make update   stop any running server, reinstall, start it again
+#   make service  run it as a systemd service, surviving reboots (Linux)
 
 BINARY  := grokbox
 VERSION := $(shell git describe --tags --dirty --always 2>/dev/null || echo dev)
@@ -16,7 +17,7 @@ BINDIR := $(PREFIX)/bin
 # Command lines of the servers `make update` stopped, so it can start them again.
 RESTART := .make-restart
 
-.PHONY: all build install uninstall update test race fmt vet dist clean stop-servers start-servers check-path
+.PHONY: all build install uninstall update service unservice test race fmt vet dist clean stop-servers start-servers check-path
 
 all: build install check-path
 	@echo
@@ -55,6 +56,51 @@ start-servers:
 		nohup sh -c "$$args" >/dev/null 2>&1 & \
 	done < $(RESTART)
 	@rm -f $(RESTART)
+
+# A server on a VM has to outlive the ssh session that started it, and come
+# back after a reboot. Kept out of `make` on purpose: installing a service that
+# starts itself is a bigger thing to do to a machine than copying a binary.
+service: install
+	@if [ "$$(uname -s)" != "Linux" ]; then \
+		echo "  make service installs a systemd unit, and this machine is not Linux."; \
+		echo "  Run grokbox serve under whatever supervises processes here."; \
+		exit 1; \
+	fi
+	@printf '%s\n' \
+		'[Unit]' \
+		'Description=grokbox — a chat room behind a key' \
+		'After=network-online.target' \
+		'Wants=network-online.target' \
+		'' \
+		'[Service]' \
+		'ExecStart=$(BINDIR)/$(BINARY) serve' \
+		'Environment=GROKBOX_HOME=/var/lib/grokbox' \
+		'EnvironmentFile=-/etc/grokbox.env' \
+		'Restart=on-failure' \
+		'RestartSec=2' \
+		'DynamicUser=yes' \
+		'StateDirectory=grokbox' \
+		'NoNewPrivileges=true' \
+		'PrivateTmp=true' \
+		'ProtectSystem=strict' \
+		'ProtectHome=true' \
+		'' \
+		'[Install]' \
+		'WantedBy=multi-user.target' \
+		| sudo tee /etc/systemd/system/grokbox.service >/dev/null
+	sudo systemctl daemon-reload
+	sudo systemctl enable --now grokbox
+	@echo
+	@echo "  grokbox is running and will come back after a reboot."
+	@echo "  its invites:  sudo $(BINARY) rooms --store /var/lib/grokbox/server"
+	@echo "  its log:      journalctl -u grokbox -f"
+	@echo "  settings:     /etc/grokbox.env  (GROKBOX_ADDR, GROKBOX_ADVERTISE, GROKBOX_ROOM)"
+	@echo
+
+unservice:
+	-sudo systemctl disable --now grokbox
+	-sudo rm -f /etc/systemd/system/grokbox.service
+	-sudo systemctl daemon-reload
 
 check-path:
 	@case ":$$PATH:" in \

@@ -6,6 +6,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -37,10 +39,11 @@ func (e *APIError) Expired() bool { return e.Code == http.StatusUnauthorized }
 // and cursor are guarded. Name is set before the first join and not written
 // afterwards.
 type Client struct {
-	Server string // base URL
-	Room   string
-	Key    string
-	Name   string
+	Server      string // base URL
+	Room        string
+	Key         string
+	Fingerprint string // pinned server certificate, when self-signed
+	Name        string
 
 	HTTP *http.Client
 
@@ -52,20 +55,53 @@ type Client struct {
 // New builds a client for an invite.
 func New(in proto.Invite, name string) *Client {
 	return &Client{
-		Server: strings.TrimRight(in.Server, "/"),
-		Room:   in.Room,
-		Key:    in.Key,
-		Name:   name,
+		Server:      strings.TrimRight(in.Server, "/"),
+		Room:        in.Room,
+		Key:         in.Key,
+		Fingerprint: in.Fingerprint,
+		Name:        name,
 		// No client-wide timeout: /v1/stream is meant to stay open. Every
 		// request that should time out carries its own context deadline.
-		HTTP: &http.Client{},
+		HTTP: &http.Client{Transport: transportFor(in.Fingerprint)},
 	}
+}
+
+// transportFor pins the server's certificate when the invite named one.
+//
+// Skipping the usual verification and checking a hash instead is not a
+// weakening here, it is the opposite: the fingerprint arrived with the invite,
+// out of band, before any connection was made. There is no first contact to be
+// impersonated on, and no authority to be mis-issued by.
+func transportFor(fingerprint string) http.RoundTripper {
+	if fingerprint == "" {
+		return http.DefaultTransport
+	}
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.TLSClientConfig = &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: true, // replaced by the check below, not dropped
+		VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
+			if len(rawCerts) == 0 {
+				return errors.New("the server presented no certificate")
+			}
+			if !proto.SameFingerprint(proto.Fingerprint(rawCerts[0]), fingerprint) {
+				return errors.New("the server's certificate does not match the invite — either the invite is stale, or this is not the server it names")
+			}
+			return nil
+		},
+	}
+	return t
 }
 
 // Invite renders the invite this client was built from, so a member can pass
 // it on to somebody else.
 func (c *Client) Invite() proto.Invite {
-	return proto.Invite{Server: c.Server, Room: c.Room, Key: c.Key}
+	return proto.Invite{
+		Server:      c.Server,
+		Room:        c.Room,
+		Key:         c.Key,
+		Fingerprint: c.Fingerprint,
+	}
 }
 
 // Seq is the sequence number of the last message this client has seen.
@@ -433,6 +469,10 @@ func friendly(server string, err error) error {
 		return fmt.Errorf("cannot resolve the host in %s", server)
 	case strings.Contains(msg, "i/o timeout"):
 		return fmt.Errorf("%s did not answer — check the address and any firewall in between", server)
+	case strings.Contains(msg, "does not match the invite"):
+		return errors.New(msg)
+	case strings.Contains(msg, "certificate"):
+		return fmt.Errorf("%s presented a certificate this client will not accept: %w", server, err)
 	}
 	return err
 }

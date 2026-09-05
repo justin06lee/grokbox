@@ -47,6 +47,7 @@ const usage = `grokbox — a chat room behind a key.
 
 usage:
   grokbox serve   [flags]                     host rooms and print their invites
+  grokbox rooms   [flags]                     reprint a running server's invites
   grokbox join    [invite] --name NAME        open the interactive chat
   grokbox send    [invite] --name NAME TEXT   say one thing and exit
   grokbox read    [invite] --name NAME        print what has been said since last time
@@ -89,6 +90,8 @@ func main() {
 	switch os.Args[1] {
 	case "serve", "server", "host":
 		err = cmdServe(ctx, args)
+	case "rooms":
+		err = cmdRooms(args)
 	case "join", "chat":
 		err = cmdJoin(ctx, args)
 	case "send", "say":
@@ -242,7 +245,8 @@ func (t *targetFlags) resolve(needName bool) (*session, error) {
 	s := &session{cl: client.New(inv, name), cfg: cfg, prof: prof, noSave: t.noSave}
 	// A saved token means we may already be in the room; keys change, so only
 	// reuse the token when the key we are about to present is the same one.
-	if prof != nil && prof.Name == name && prof.Key == inv.Key && prof.Token != "" {
+	if prof != nil && prof.Name == name && prof.Key == inv.Key &&
+		prof.Fingerprint == inv.Fingerprint && prof.Token != "" {
 		s.cl.SetToken(prof.Token)
 		s.cl.SetSeq(prof.Seq)
 		s.resumed = true
@@ -257,12 +261,13 @@ func (s *session) save() {
 	}
 	inv := s.cl.Invite()
 	s.cfg.Remember(client.Profile{
-		Server: inv.Server,
-		Room:   inv.Room,
-		Key:    inv.Key,
-		Name:   s.cl.Name,
-		Token:  s.cl.Token(),
-		Seq:    s.cl.Seq(),
+		Server:      inv.Server,
+		Room:        inv.Room,
+		Key:         inv.Key,
+		Fingerprint: inv.Fingerprint,
+		Name:        s.cl.Name,
+		Token:       s.cl.Token(),
+		Seq:         s.cl.Seq(),
 	})
 	if err := s.cfg.Save(); err != nil {
 		fmt.Fprintln(os.Stderr, "grokbox: cannot save config: "+err.Error())
@@ -293,6 +298,9 @@ func cmdInvite(args []string) error {
 	inv := s.cl.Invite()
 	if *decode {
 		fmt.Printf("server  %s\nroom    %s\nkey     %s\n", inv.Server, inv.Room, inv.Key)
+		if inv.Fingerprint != "" {
+			fmt.Printf("cert    %s\n", inv.Fingerprint)
+		}
 		return nil
 	}
 	fmt.Println(inv.Encode())
