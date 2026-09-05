@@ -20,6 +20,11 @@ human gets a chat window with a pinned input line; an agent gets `read`,
 `send` and `tail` with a saved cursor and JSON output, so a loop of reads never
 sees the same message twice. Both are ordinary members of the same room.
 
+It is meant to be run where everyone can reach it — a VM, a box with a public
+address — so the connection is HTTPS from the start, with a certificate the
+server signs itself and the invite pins. That takes no domain, no certificate
+authority and no renewal.
+
 ## Install
 
 ```bash
@@ -41,22 +46,32 @@ binaries for macOS, Linux and Windows into `./dist`.
 ```console
 $ grokbox serve
 
-grokbox v0.1.0 — listening on :7777
-reachable at http://192.168.1.24:7777
+grokbox v0.1.2 — listening on :7777
+reachable at https://203.0.113.9:7777   (public — anyone with the invite can reach it)
 
   room    lounge
   key     nsfq-z29d-wkb4-dz3x
-  invite  grokbox1-eyJzIjoiaHR0cDovLzE5Mi4xNjguMS4yNDo3Nzc3IiwiciI6ImxvdW5nZSIsImsiOiJuc2ZxLXoyOWQtd2tiNC1kejN4In0
+  invite  grokbox1-eyJzIjoiaHR0cHM6Ly8yMDMuMC4xMTMuOTo3Nzc3IiwiciI6ImxvdW5nZSIs…
 
   hand out the invite, then everyone runs:
 
-      grokbox join grokbox1-eyJzIjoiaHR0cDovLzE5Mi4xNjgu… --name <their-name>
+      grokbox join grokbox1-eyJzIjoiaHR0cHM6Ly8yMDMuMC4xMTMu… --name <their-name>
+
+  tls     self-signed, pinned by the invite (xqCkVZng6zxPfflLSNs7hdazyVr0CgZ5lG49EXcryzY)
+  store   /var/lib/grokbox/server
 ```
 
-The invite code carries the address, the room name and the key in one string,
-so there is exactly one thing to share. Keys and transcripts are kept under
-`~/.config/grokbox/server`, which means the code you handed out yesterday still
-works after a restart.
+The invite code carries the address, the room name, the key and the certificate
+hash in one string, so there is exactly one thing to share. All of it is kept
+under `~/.config/grokbox/server`, which means the code you handed out yesterday
+still works after a restart — same key, same certificate.
+
+It also says how far the address it printed actually goes. A public address is
+one anyone can reach; `(this network only)` means the invite works on your wifi
+and nowhere else, which is the single most confusing way for this to fail.
+
+Lost the code? `grokbox rooms` reprints it from the store without touching the
+running server.
 
 Useful flags:
 
@@ -64,12 +79,13 @@ Useful flags:
 |---|---|
 | `--addr :7777` | Address to listen on. |
 | `--room lounge` | Room to host. Repeat it for several rooms; `--room lounge=my-key` sets the key yourself. |
-| `--advertise URL` | The public address to put in invites, when the server sits behind a tunnel or proxy. |
+| `--advertise URL` | The address to put in invites, when the server sits behind a proxy or a name. |
 | `--open` | Let joiners create rooms that do not exist yet; the first one in sets the key. |
 | `--store ""` | Keep everything in memory, so keys and history vanish on exit. |
 | `--history 200` | Messages retained and replayed per room. |
 | `--idle 90s` | How long a member can go unheard from before the room drops them. |
-| `--tls-cert / --tls-key` | Serve HTTPS directly instead of behind a proxy. |
+| `--tls-cert / --tls-key` | Use a real certificate instead of a self-signed one. Invites then pin nothing, because it verifies on its own. |
+| `--tls=false` | Serve plain HTTP. Only when something in front is already terminating TLS. |
 
 ## Join a room
 
@@ -91,32 +107,70 @@ to the bottom no matter who says what while you are typing. Inside it:
 After the first join, the room is remembered — `grokbox join` on its own goes
 back to it.
 
-## Letting people in from outside your network
+## Running it where everyone can reach it
 
-The address `serve` prints is a LAN address; it works for everyone on the same
-wifi and nobody else. To let people further away in, expose the port and tell
-grokbox what the outside world calls it:
+Put it on a machine with a public address — a VM, a cheap box, anything — and
+there is nothing to configure:
 
 ```bash
-# a quick tunnel
-cloudflared tunnel --url http://localhost:7777
-grokbox serve --advertise https://something.trycloudflare.com
-
-# a machine you already own
-grokbox serve --addr :7777 --advertise https://chat.example.com
-
-# a private network, no tunnel needed
-tailscale ip -4                     # -> 100.x.y.z
-grokbox serve --advertise http://100.x.y.z:7777
+grokbox serve
 ```
 
-Anything that can forward plain HTTP will do: grokbox streams over
-server-sent events, not WebSocket, so it survives proxies that do not know what
-a WebSocket upgrade is.
+It works out its own public address (directly from the interface on most
+providers, and from the instance metadata service on AWS, GCP, Azure and
+DigitalOcean, where the public address is mapped in front of a private one),
+signs a certificate, and prints an invite that anyone can use from anywhere.
 
-Over plain HTTP the room key crosses the network in the clear. Put the server
-behind HTTPS — a tunnel, a reverse proxy, or `--tls-cert`/`--tls-key` — for
-anything you would mind a stranger on the same coffee-shop wifi reading.
+To keep it running after you close the ssh session, and after a reboot:
+
+```bash
+make service                   # installs a systemd unit, Linux
+grokbox rooms --store /var/lib/grokbox/server    # the invites, any time later
+```
+
+Settings for the service live in `/etc/grokbox.env` — `GROKBOX_ADDR`,
+`GROKBOX_ADVERTISE`, `GROKBOX_ROOM`.
+
+### If you have a domain
+
+Point it at the box and either bring your own certificate, or let whatever is
+already terminating TLS keep doing it:
+
+```bash
+grokbox serve --advertise https://chat.example.com \
+              --tls-cert /etc/letsencrypt/live/chat.example.com/fullchain.pem \
+              --tls-key  /etc/letsencrypt/live/chat.example.com/privkey.pem
+
+# or behind a reverse proxy that already speaks HTTPS
+grokbox serve --addr 127.0.0.1:7777 --tls=false --advertise https://chat.example.com
+```
+
+With a real certificate the invite carries no fingerprint, because the
+certificate proves itself.
+
+### Why the certificate is in the invite
+
+A room on a bare IP has no domain, so no certificate authority will vouch for
+it — and the usual answer, plain HTTP, would put the room key in the clear on
+every join. So the server signs its own certificate and the invite carries the
+hash of it.
+
+That is not the weaker version of HTTPS, it is a stronger one. The client knows
+exactly which certificate to expect *before it connects*, because the
+fingerprint came with the invite you were handed. There is no first contact to
+be impersonated on and no authority that can be persuaded to issue a second
+certificate for the same name. A client whose invite has a fingerprint will
+refuse anything else, and a client whose invite has none will not accept a
+self-signed certificate at all.
+
+The certificate lives in the store beside the room keys, so restarts do not
+invalidate the invites you have handed out.
+
+### Still just on your wifi
+
+That works too and needs none of the above — `serve` says `(this network
+only)`, and everyone on the same network can join. It is only when somebody
+leaves the building that they need an address that goes further.
 
 ## For agents
 
@@ -146,6 +200,7 @@ bmo add justin06lee/grokbox/skills/grokbox        # or copy the folder into your
 
 ```
 grokbox serve   [flags]                     host rooms and print their invites
+grokbox rooms   [flags]                     reprint a server's invites, without starting it
 grokbox join    [invite] --name NAME        open the interactive chat
 grokbox send    [invite] --name NAME TEXT   say one thing and exit
 grokbox read    [invite] --name NAME        print what has been said since last time
@@ -181,8 +236,9 @@ the room they belong to, and presenting an old token with a join reclaims that
 name — so a client that was cut off comes straight back instead of waiting out
 the idle timeout.
 
-A room that does not exist answers exactly like a wrong key, so the server
-cannot be used to enumerate the rooms it hosts. Message text has its control
+Connections are HTTPS unless you turn that off. A room that does not exist
+answers exactly like a wrong key, so the server cannot be used to enumerate the
+rooms it hosts. Message text has its control
 characters stripped before anyone else sees it, because a chat line is not
 allowed to repaint somebody else's terminal. Members are rate-limited to about
 one message a second with a burst of ten.
@@ -193,6 +249,8 @@ one message a second with a burst of ten.
 |---|---|
 | `~/.config/grokbox/client.json` | Rooms this machine has joined, their keys, and read cursors. Mode `0600`. |
 | `~/.config/grokbox/server/rooms.json` | Room keys, so invites survive a restart. |
+| `~/.config/grokbox/server/cert.pem`, `key.pem` | The self-signed certificate the invites pin. Mode `0600`. |
+| `~/.config/grokbox/server/server.json` | The advertised address, so `grokbox rooms` can rebuild invites. |
 | `~/.config/grokbox/server/<room>.jsonl` | The transcript, one message per line. |
 
 `GROKBOX_HOME` moves all of it somewhere else, which is also how you run
@@ -205,6 +263,7 @@ make test     # go test ./...
 make race     # the same, with the race detector
 make          # build, install, verify
 make update   # stop a running server, reinstall, start it again
+make service  # run it under systemd, surviving reboots (Linux)
 ```
 
 The code is four small packages: `internal/proto` (the wire format and the
