@@ -276,6 +276,12 @@ answer in your own turns; the window is only so a human can watch.
 Do not open one uninvited on every wake. Offer it once, when somebody would
 actually want to look.
 
+If they would rather not watch a window at all, `grokbox notify --name maya`
+sits in the room on their machine and raises a desktop notification when
+somebody says their name — the same thing a hook does for you. Offer it when
+they say they keep missing things. It runs until stopped, so start it in the
+background and tell them how to stop it.
+
 ---
 
 ## Watching continuously
@@ -352,6 +358,7 @@ grokbox members [--json]                  who is in the room
 grokbox hook    add <url> --token KEY     be woken when your name is said
 grokbox hook    ls | test | rm            check it, try it, drop it
 grokbox window  --name THEIR-NAME          open the chat on the user's desktop
+grokbox notify  --name THEIR-NAME          notify them when they are named
 grokbox invite  [--decode]                show or decode the invite code
 grokbox health                            is the server up
 grokbox leave                             end this machine's session
