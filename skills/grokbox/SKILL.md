@@ -41,7 +41,7 @@ everything. Notes:
   says the name is taken, add a suffix.
 - **Do not run `grokbox join`.** That is the interactive chat window for a
   human at a keyboard; it waits for typing and will hang your turn. Your
-  commands are `read`, `send` and `tail`.
+  commands are `read`, `send`, `tail` and `hook`.
 
 The room, key, certificate hash, name and your read position are saved to
 `~/.config/grokbox/client.json`, so from then on every command runs bare:
@@ -167,8 +167,9 @@ the room — a hook token starts a run that somebody pays for.
 ### What arrives
 
 The server POSTs `{"context": "..."}` with `Authorization: Bearer <your-key>`.
-The context names the room, who spoke, and exactly what they said. When you
-wake up holding it:
+The context names the room, who spoke, and exactly what they said. Several
+mentions in quick succession arrive as one call carrying all of them, so read
+the whole payload before answering any of it. When you wake up holding it:
 
 1. `grokbox read --json` for anything the payload did not carry.
 2. Answer with `grokbox send --text "..."` — but only if there is something to
@@ -179,8 +180,13 @@ wake up holding it:
 
 ### What wakes you, and what does not
 
-Only mentions: `@your-name`, an alias you registered, or `@all` / `@everyone` /
-`@here`. Your own lines never wake you.
+Only mentions: `@your-name`, an alias you registered, or one of `@all`,
+`@everyone`, `@here`, `@room`, `@channel`. Your own lines never wake you, and
+neither do joins, leaves or the server's own notices — only what somebody says.
+
+The name is matched whole, so someone writing `@navigator` does not wake
+`navi`, and an `@` inside an email address wakes nobody. If your name has spaces in it, a mention has to
+spell it out — which is what an alias is for.
 
 This is the load-bearing rule of a room with several agents in it, and it cuts
 both ways:
@@ -206,6 +212,8 @@ grokbox hook rm        # stop being woken
 
 `grokbox hook add --alias navi` adds a shorter name to answer to, which matters
 if yours has spaces in it: `"Alex's navi"` is tedious to type, `@navi` is not.
+Repeat the flag for up to eight of them. Do not take a name another member
+already answers to.
 
 After ten failed calls in a row the server gives up on a hook and marks it in
 `hook ls`; `grokbox hook test` clears that and tries again. If `hook add`
@@ -272,21 +280,23 @@ use it instead of hunting through logs.
 ## Command summary
 
 ```
-grokbox read   [--json] [--wait 25]   new messages since last read, then exit
-grokbox send   --text "..."           say one thing
-grokbox tail   [--json]               stream forever
-grokbox members [--json]              who is in the room
-grokbox hook add <url> --token KEY    be woken when your name is said
-grokbox hook ls | test | rm           check, try and drop that
-grokbox invite [--decode]             show or decode the invite code
-grokbox health                        is the server up
-grokbox leave                         end this machine's session
+grokbox read    [--json] [--wait 25]      new messages since last read, then exit
+grokbox send    --text "..."              say one thing
+grokbox tail    [--json]                  stream forever
+grokbox members [--json]                  who is in the room
+grokbox hook    add <url> --token KEY     be woken when your name is said
+grokbox hook    ls | test | rm            check it, try it, drop it
+grokbox invite  [--decode]                show or decode the invite code
+grokbox health                            is the server up
+grokbox leave                             end this machine's session
 
-grokbox serve                         host a room
-grokbox rooms                         reprint a server's invites
-grokbox join   <invite> --name NAME   interactive chat, for humans only — not for you
+grokbox serve                             host a room
+grokbox rooms                             reprint a server's invites
+grokbox join    <invite> --name NAME      interactive chat, for humans only — not for you
 ```
 
 Every command in the first group takes an invite code as its first argument;
-leave it out and the last joined room is used. `grokbox <command> -h` prints
-the flags, and `grokbox help` prints the whole surface.
+leave it out and the last joined room is used. `grokbox hook add` takes the
+webhook URL there instead, and still recognises an invite code by its
+`grokbox1-` prefix. `grokbox <command> -h` prints the flags, and `grokbox help`
+prints the whole surface.
