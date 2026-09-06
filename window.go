@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/justin06lee/grokbox/internal/desktop"
 )
 
 // A room an agent is in is invisible to the person it works for. `window`
@@ -74,14 +76,14 @@ func cmdWindow(ctx context.Context, args []string) error {
 
 	if *dryRun {
 		for _, kv := range env {
-			fmt.Printf("%s=%s\n", kv[0], shellQuote(kv[1]))
+			fmt.Printf("%s=%s\n", kv[0], desktop.ShellQuote(kv[1]))
 		}
-		fmt.Println(shellJoin(argv))
+		fmt.Println(desktop.ShellJoin(argv))
 		return nil
 	}
 
 	if err := openWindow(argv, env, *home, *termProg); err != nil {
-		manual := shellJoin([]string{self, "join", s.cl.Invite().Encode(), "--name", s.cl.Name})
+		manual := desktop.ShellJoin([]string{self, "join", s.cl.Invite().Encode(), "--name", s.cl.Name})
 		return fmt.Errorf("%w\n\nrun this yourself in a terminal instead:\n  %s", err, manual)
 	}
 	fmt.Printf("opened the room in a window as %s\n", s.cl.Name)
@@ -122,16 +124,16 @@ func launcher(argv []string, env [][2]string, home string) (string, error) {
 	// Out of the temp directory, so the window is not named after it.
 	b.WriteString("cd \"$HOME\" 2>/dev/null || true\n")
 	for _, kv := range env {
-		fmt.Fprintf(&b, "%s=%s\nexport %s\n", kv[0], shellQuote(kv[1]), kv[0])
+		fmt.Fprintf(&b, "%s=%s\nexport %s\n", kv[0], desktop.ShellQuote(kv[1]), kv[0])
 	}
 	if home != "" {
-		fmt.Fprintf(&b, "GROKBOX_HOME=%s\nexport GROKBOX_HOME\n", shellQuote(home))
+		fmt.Fprintf(&b, "GROKBOX_HOME=%s\nexport GROKBOX_HOME\n", desktop.ShellQuote(home))
 	} else {
 		// The window belongs to the person at the keyboard, not to whatever
 		// agent opened it, so it must not inherit an agent's state directory.
 		b.WriteString("unset GROKBOX_HOME\n")
 	}
-	fmt.Fprintf(&b, "exec %s\n", shellJoin(argv))
+	fmt.Fprintf(&b, "exec %s\n", desktop.ShellJoin(argv))
 
 	if _, err := f.WriteString(b.String()); err != nil {
 		return "", err
@@ -161,7 +163,7 @@ tell application %s
 	try
 		set bounds of front window to deskBounds
 	end try
-end tell`, appleString(app), appleString(script))
+end tell`, desktop.AppleString(app), desktop.AppleString(script))
 
 	cmd := exec.Command("osascript", "-e", osa)
 	out, err := cmd.CombinedOutput()
@@ -235,26 +237,4 @@ func spawn(path string, args []string) error {
 		return fmt.Errorf("could not open %s: %w", filepath.Base(path), err)
 	}
 	return cmd.Process.Release()
-}
-
-// ------------------------------------------------------------------ quoting
-
-// shellQuote wraps a string so a POSIX shell reads it back unchanged.
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
-}
-
-func shellJoin(argv []string) string {
-	out := make([]string, len(argv))
-	for i, a := range argv {
-		out[i] = shellQuote(a)
-	}
-	return strings.Join(out, " ")
-}
-
-// appleString renders an AppleScript string literal.
-func appleString(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `"`, `\"`)
-	return `"` + s + `"`
 }
