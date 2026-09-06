@@ -53,6 +53,7 @@ usage:
   grokbox members [invite] --name NAME        list who is in the room
   grokbox hook    add|ls|rm|test              be woken when your name is said
   grokbox window  --name NAME                 open the chat on this desktop, full screen
+  grokbox notify  --name NAME                 raise a notification when you are named
   grokbox invite  [invite]                    show or decode an invite code
   grokbox health  [invite]                    check that a server is up
   grokbox leave   [invite]                    end this machine's session
@@ -115,6 +116,8 @@ func main() {
 		err = cmdHook(ctx, args)
 	case "window", "open":
 		err = cmdWindow(ctx, args)
+	case "notify", "watch-mentions":
+		err = cmdNotify(ctx, args)
 	case "leave", "part":
 		err = cmdLeave(ctx, args)
 	case "invite":

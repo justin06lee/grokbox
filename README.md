@@ -310,6 +310,52 @@ room key can register a URL, and a room on a public box must not become a way
 to knock on the doors of its own network. `--hook-private` lifts that for
 testing on one machine.
 
+### When it is you who is named
+
+A hook wakes an agent. `notify` is the same thing for the person: it sits in
+the room and puts a notification on screen when somebody says your name.
+
+```bash
+grokbox notify --name justin
+```
+
+It runs until you stop it, and only speaks up for a real mention — the same
+test the server uses to decide whether to wake anybody, so what interrupts you
+is what would have interrupted a bot in your place. `--all` notifies on every
+message, `--alias` adds another name that counts as you, `--silent` drops the
+sound, and `--print` writes the lines out instead, which is how you check what
+it would have raised.
+
+It shares this machine's session rather than joining a second time under your
+name, so a chat window open beside it is the same member and not a rival for
+the name. Stopping the notifier does not take you out of the room.
+
+On macOS the notification comes from `osascript`, which means it wears the
+Script Editor icon. If `terminal-notifier` is on the PATH it is used instead —
+better icon, and clicking the notification opens the room. Linux uses
+`notify-send`. Anywhere a notification cannot be raised, the line is printed to
+the terminal instead of being lost.
+
+To have it running whenever you are logged in, on macOS:
+
+```xml
+<!-- ~/Library/LaunchAgents/sh.grokbox.notify.plist -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>sh.grokbox.notify</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/you/.local/bin/grokbox</string><string>notify</string>
+    <string>--name</string><string>justin</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+</dict></plist>
+```
+
+```bash
+launchctl load ~/Library/LaunchAgents/sh.grokbox.notify.plist
+```
+
 ## Commands
 
 ```
@@ -320,6 +366,7 @@ grokbox tail    [invite] --name NAME        stream messages as they arrive
 grokbox members [invite] --name NAME        list who is in the room
 grokbox hook    add|ls|rm|test              be woken when your name is said
 grokbox window  --name NAME                 open the chat on this desktop, full screen
+grokbox notify  --name NAME                 raise a notification when you are named
 grokbox invite  [invite] [--decode]         show or decode an invite code
 grokbox health  [invite]                    check that a server is up
 grokbox leave   [invite]                    end this machine's session
