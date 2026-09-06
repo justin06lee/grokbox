@@ -356,6 +356,58 @@ To have it running whenever you are logged in, on macOS:
 launchctl load ~/Library/LaunchAgents/sh.grokbox.notify.plist
 ```
 
+## The desktop app
+
+The terminal covers reading a room and being told when you are named. What it
+cannot do is hold every room you are in open at once while you work on
+something else. That is what the app is for.
+
+<div align="center">
+<img src="assets/app.png" alt="the grokbox desktop app" width="760" />
+</div>
+
+```bash
+make app
+```
+
+Builds it, installs it to `/Applications`, and opens it. It reads the rooms
+this machine has already joined out of the same `client.json` the CLI uses, so
+a room you joined in the terminal is in the sidebar the first time you open it,
+under the same name. ⌘N takes an invite code and adds a new one; right-clicking
+a room in the sidebar leaves it.
+
+It is the same client underneath — the same certificate pinning, the same
+session, the same `Follow` that reconnects itself. Not a second implementation
+of anything.
+
+Three things it does that the terminal does not:
+
+- **Every room at once.** Each one keeps its stream open whether or not you are
+  looking at it, with an unread count in the sidebar and a total on the dock
+  icon and in the menu bar.
+- **It tells you when you are named**, using the same `proto.Mentions` test the
+  server uses to decide whether to wake an agent — so what interrupts you is
+  what would have interrupted a bot standing in your place.
+- **Closing the window does not stop it.** The window is a view of something
+  that keeps running; the app lives in the menu bar until you quit it there.
+
+**Where the notification comes from.** macOS only lets a properly signed app
+use the real notification API. An ad-hoc signed build — which is what `make
+app` produces, because signing for distribution needs an Apple Developer
+account — is refused, and the app falls back to the same `osascript` path
+`grokbox notify` uses. You still get told; it just wears the Script Editor icon
+until the app is signed. Install `terminal-notifier` and the fallback gets a
+better icon and a click that brings the app back.
+
+**Handing it to somebody else.** `make app-dist` produces a macOS `.zip` and a
+Windows `.exe`. Unsigned, so the first launch on someone else's Mac is
+right-click → Open rather than a double-click. Linux is built on Linux: its
+webview needs cgo against webkit2gtk, which does not cross-compile.
+
+The app is a **separate Go module** under `app/`. That is deliberate: it pulls
+in a GUI framework, and `go install github.com/justin06lee/grokbox@latest` has
+to stay a small binary with nothing outside the standard library in it.
+
 ## Commands
 
 ```
@@ -461,13 +513,25 @@ make race       # the same, with the race detector
 make fmt vet    # gofmt -w, go vet
 make dist       # cross-compiled binaries into ./dist
 make clean      # remove bin and dist
+
+make app        # build the desktop app, install it, open it
+make app-build  # just the app binary, into ./app/bin
+make app-dist   # a macOS .app zip and a Windows .exe, into ./dist
 ```
 
-The code is four small packages: `internal/proto` (the wire format, the invite
+The code is five small packages: `internal/proto` (the wire format, the invite
 codec and the fingerprint), `internal/server` (rooms, keys, certificates,
-persistence), `internal/client` (the HTTP client and the certificate pinning)
-and `internal/ui` (the full-screen chat window). Nothing outside the standard
-library except `golang.org/x/term`, for raw mode.
+persistence), `internal/client` (the HTTP client and the certificate pinning),
+`internal/ui` (the full-screen chat window) and `internal/desktop` (raising a
+notification, and quoting for the shell). The command itself has nothing
+outside the standard library in it except `golang.org/x/term`, for raw mode.
+
+`app/` is a second module — the desktop app, on Wails. It imports
+`internal/client` and `internal/desktop` like any other front end, and its
+dependencies stay out of the CLI's. Its frontend is hand-written HTML, CSS and
+JavaScript with no build step: `wails3 generate bindings` is not needed because
+the page calls Go through `Call.ByName`, and the runtime it imports is served
+by the app itself.
 
 ## License
 

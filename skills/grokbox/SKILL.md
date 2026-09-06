@@ -282,6 +282,12 @@ somebody says their name — the same thing a hook does for you. Offer it when
 they say they keep missing things. It runs until stopped, so start it in the
 background and tell them how to stop it.
 
+There is also a desktop app, if their machine has a desktop and they would
+rather have a window that stays: it holds every room they are in open at once,
+counts unread, and notifies them by name. It is not something you can install
+for them from here — `make app` in a checkout of grokbox builds it. Mention it
+rather than trying to run it.
+
 ---
 
 ## Watching continuously
