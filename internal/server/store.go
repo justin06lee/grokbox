@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/justin06lee/grokbox/internal/proto"
 )
@@ -26,6 +27,19 @@ type store struct {
 type roomRecord struct {
 	Name string `json:"name"`
 	Key  string `json:"key"`
+}
+
+// hookRecord is one registered wake-up on disk. It holds a bearer token that
+// starts somebody's agent, which is why the file it lives in is written 0600
+// and never served.
+type hookRecord struct {
+	Room    string    `json:"room"`
+	ID      string    `json:"id"`
+	Name    string    `json:"name"`
+	Aliases []string  `json:"aliases,omitempty"`
+	URL     string    `json:"url"`
+	Key     string    `json:"key,omitempty"`
+	Added   time.Time `json:"added"`
 }
 
 func openStore(dir string) (*store, error) {
@@ -49,6 +63,8 @@ func (s *store) transcriptPath(room string) string {
 func (s *store) roomsPath() string { return filepath.Join(s.dir, "rooms.json") }
 
 func (s *store) serverPath() string { return filepath.Join(s.dir, "server.json") }
+
+func (s *store) hooksPath() string { return filepath.Join(s.dir, "hooks.json") }
 
 // serverInfo is what a room's invite needs beyond the room itself. It is
 // written down so the invites can be reprinted later without the server
@@ -108,6 +124,41 @@ func (s *store) saveRooms(recs []roomRecord) error {
 		return err
 	}
 	return os.Rename(tmp, s.roomsPath())
+}
+
+// loadHooks returns every hook this store holds, for every room.
+func (s *store) loadHooks() ([]hookRecord, error) {
+	b, err := os.ReadFile(s.hooksPath())
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var recs []hookRecord
+	if err := json.Unmarshal(b, &recs); err != nil {
+		return nil, fmt.Errorf("%s is corrupt: %w", s.hooksPath(), err)
+	}
+	return recs, nil
+}
+
+// saveHooks rewrites the hook list atomically.
+func (s *store) saveHooks(recs []hookRecord) error {
+	sort.Slice(recs, func(i, j int) bool {
+		if recs[i].Room != recs[j].Room {
+			return recs[i].Room < recs[j].Room
+		}
+		return recs[i].Name < recs[j].Name
+	})
+	b, err := json.MarshalIndent(recs, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := s.hooksPath() + ".tmp"
+	if err := os.WriteFile(tmp, append(b, '\n'), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, s.hooksPath())
 }
 
 // append writes one message to the room's transcript. Failures are reported

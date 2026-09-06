@@ -55,6 +55,11 @@ type Room struct {
 
 	historyN int
 	store    *store
+
+	// onPost is called after every message the room takes, outside the lock.
+	// It is how hooks learn there is somebody to wake. Set once, before the
+	// room is reachable.
+	onPost func(proto.Message)
 }
 
 func newRoom(name, key string, historyN int, st *store) *Room {
@@ -219,6 +224,9 @@ func (r *Room) post(kind, from, text string) int64 {
 	if st != nil {
 		st.append(r.name, m)
 	}
+	if r.onPost != nil {
+		r.onPost(m)
+	}
 	return m.Seq
 }
 
@@ -265,6 +273,17 @@ func (r *Room) Wait(ctx context.Context, since int64, timeout time.Duration) ([]
 			return nil, seq
 		}
 	}
+}
+
+// NameOf reports the display name behind a session token, or "" if the token
+// is not in this room.
+func (r *Room) NameOf(token string) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if s := r.byToken[token]; s != nil {
+		return s.name
+	}
+	return ""
 }
 
 // Members lists everyone currently in the room, alphabetically.

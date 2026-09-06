@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Version is the protocol version. A client refuses to talk to a server that
@@ -29,6 +30,10 @@ const (
 	MaxKeyLen     = 128
 	MaxTextLen    = 4000
 	MaxRoomMember = 64
+	MaxRoomHook   = 32
+	MaxHookURLLen = 512
+	MaxHookKeyLen = 512
+	MaxHookAlias  = 8
 )
 
 // Message kinds.
@@ -96,6 +101,143 @@ type MessagesResponse struct {
 	Messages []Message `json:"messages"`
 	Seq      int64     `json:"seq"` // latest sequence number in the room
 	Members  []Member  `json:"members"`
+}
+
+// Hook is a standing request to be woken. A member registers the address of
+// something that starts an agent — a Grok Bot routine's webhook, a CI job, a
+// script — and the server calls it whenever that member is mentioned in the
+// room. It is the difference between an agent that has to be told to look and
+// one that hears its name.
+//
+// The bearer token is never returned by the API: it is a credential that
+// starts a run, so it goes to the server and stays there.
+type Hook struct {
+	ID      string    `json:"id"`
+	Name    string    `json:"name"`              // whose mentions wake it
+	Aliases []string  `json:"aliases,omitempty"` // other @names it answers to
+	URL     string    `json:"url"`
+	Added   time.Time `json:"added"`
+	Woken   int64     `json:"woken"`            // deliveries made
+	Failed  int       `json:"failed,omitempty"` // consecutive failures
+	Broken  bool      `json:"broken,omitempty"` // gave up after too many
+}
+
+// HookAddRequest is the body of POST /v1/hooks. The hook wakes on mentions of
+// whoever registers it, so there is no name to give.
+type HookAddRequest struct {
+	URL     string   `json:"url"`
+	Key     string   `json:"key,omitempty"` // bearer token for the call
+	Aliases []string `json:"aliases,omitempty"`
+}
+
+// HookResponse carries one hook.
+type HookResponse struct {
+	Hook Hook `json:"hook"`
+}
+
+// HooksResponse lists the hooks in a room.
+type HooksResponse struct {
+	Hooks []Hook `json:"hooks"`
+}
+
+// Names that wake everybody at once.
+var everyoneAliases = []string{"all", "everyone", "room", "channel", "here"}
+
+// Mentions reports whether text addresses name, or one of its aliases, or the
+// whole room.
+//
+// A mention is the name after an "@", bounded on both sides: "@navi" in
+// "@navi are you there?" counts, "@navigator" does not, and neither does the
+// "@" in an email address. Names may contain spaces — a bot called
+// "Alex's navi" is reached as "@Alex's navi" — which is why this matches
+// whole candidates rather than splitting the line into words.
+func Mentions(text, name string, aliases []string) bool {
+	if strings.IndexByte(text, '@') < 0 {
+		return false
+	}
+	low := strings.ToLower(text)
+	if mentionsOne(low, strings.ToLower(strings.TrimSpace(name))) {
+		return true
+	}
+	for _, a := range aliases {
+		if mentionsOne(low, strings.ToLower(strings.TrimSpace(a))) {
+			return true
+		}
+	}
+	for _, a := range everyoneAliases {
+		if mentionsOne(low, a) {
+			return true
+		}
+	}
+	return false
+}
+
+// mentionsOne looks for "@candidate" in an already-lowercased line.
+func mentionsOne(low, candidate string) bool {
+	if candidate == "" {
+		return false
+	}
+	want := "@" + candidate
+	for i := 0; ; {
+		j := strings.Index(low[i:], want)
+		if j < 0 {
+			return false
+		}
+		at := i + j
+		end := at + len(want)
+		if boundaryBefore(low, at) && boundaryAfter(low, end) {
+			return true
+		}
+		i = at + 1
+	}
+}
+
+// boundaryBefore rejects an "@" glued to the end of a word, which is what an
+// email address looks like.
+func boundaryBefore(s string, at int) bool {
+	if at == 0 {
+		return true
+	}
+	r, _ := utf8.DecodeLastRuneInString(s[:at])
+	return !isNameRune(r)
+}
+
+// boundaryAfter rejects a longer name that merely starts with a shorter one,
+// so "@navigator" does not wake "navi".
+func boundaryAfter(s string, end int) bool {
+	if end >= len(s) {
+		return true
+	}
+	r, _ := utf8.DecodeRuneInString(s[end:])
+	return !isNameRune(r)
+}
+
+func isNameRune(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-'
+}
+
+// CleanHookURL checks an address the server is being asked to call. It must be
+// absolute and, unless the operator has said otherwise, HTTPS: the bearer
+// token travels with every call.
+func CleanHookURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", errors.New("a webhook URL is required")
+	}
+	if len(raw) > MaxHookURLLen {
+		return "", fmt.Errorf("webhook URL is longer than %d characters", MaxHookURLLen)
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("that is not a URL: %w", err)
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return "", errors.New("webhook URL must be http or https")
+	}
+	if u.Host == "" {
+		return "", errors.New("webhook URL has no host")
+	}
+	return u.String(), nil
 }
 
 // Error is the body of every non-2xx response.
