@@ -51,6 +51,7 @@ usage:
   grokbox read    [invite] --name NAME        print what has been said since last time
   grokbox tail    [invite] --name NAME        stream messages as they arrive
   grokbox members [invite] --name NAME        list who is in the room
+  grokbox hook    add|ls|rm|test              be woken when your name is said
   grokbox invite  [invite]                    show or decode an invite code
   grokbox health  [invite]                    check that a server is up
   grokbox leave   [invite]                    end this machine's session
@@ -109,6 +110,8 @@ func main() {
 		err = cmdTail(ctx, args)
 	case "members", "who":
 		err = cmdMembers(ctx, args)
+	case "hook", "hooks":
+		err = cmdHook(ctx, args)
 	case "leave", "part":
 		err = cmdLeave(ctx, args)
 	case "invite":

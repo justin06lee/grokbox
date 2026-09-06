@@ -132,3 +132,55 @@ func TestFingerprint(t *testing.T) {
 		t.Error("SameFingerprint accepted a mismatch")
 	}
 }
+
+func TestMentions(t *testing.T) {
+	cases := []struct {
+		text    string
+		name    string
+		aliases []string
+		want    bool
+		why     string
+	}{
+		{"@navi are you there?", "navi", nil, true, "the plain case"},
+		{"hey @Navi", "navi", nil, true, "case does not matter"},
+		{"@navi, can you check", "navi", nil, true, "punctuation ends a name"},
+		{"ask @navi about it", "navi", nil, true, "mid-sentence"},
+
+		{"navi are you there?", "navi", nil, false, "a name without an @ is just a word"},
+		{"@navigator is a different bot", "navi", nil, false, "a longer name is not this one"},
+		{"mail me at justin@navi.example", "navi", nil, false, "an email address is not a mention"},
+		{"nothing here", "navi", nil, false, "no @ at all"},
+
+		{"@Alex's navi can you find a time?", "Alex's navi", nil, true, "names may hold spaces"},
+		{"@navi ping", "Alex's navi", []string{"navi"}, true, "an alias answers too"},
+		{"@nav ping", "Alex's navi", []string{"navi"}, false, "an alias is matched whole"},
+
+		{"@all standup in five", "navi", nil, true, "@all wakes everybody"},
+		{"@everyone ^", "navi", nil, true, "so does @everyone"},
+		{"@here", "navi", nil, true, "and @here"},
+		{"is it @allowed?", "navi", nil, false, "@all does not match a longer word"},
+	}
+	for _, c := range cases {
+		if got := Mentions(c.text, c.name, c.aliases); got != c.want {
+			t.Errorf("Mentions(%q, %q, %v) = %v, want %v — %s", c.text, c.name, c.aliases, got, c.want, c.why)
+		}
+	}
+}
+
+func TestCleanHookURL(t *testing.T) {
+	good := []string{
+		"https://api2.cursor.sh/automations/webhook/abc123",
+		"http://example.com/hook",
+	}
+	for _, u := range good {
+		if _, err := CleanHookURL(u); err != nil {
+			t.Errorf("CleanHookURL(%q) refused a good URL: %v", u, err)
+		}
+	}
+	bad := []string{"", "   ", "ftp://example.com/x", "not a url at all", "https://"}
+	for _, u := range bad {
+		if _, err := CleanHookURL(u); err == nil {
+			t.Errorf("CleanHookURL(%q) accepted a bad URL", u)
+		}
+	}
+}

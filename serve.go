@@ -49,6 +49,9 @@ func cmdServe(ctx context.Context, args []string) error {
 	useTLS := fs.Bool("tls", true, "serve HTTPS; pass --tls=false only when something in front of this already terminates it")
 	cert := fs.String("tls-cert", "", "TLS certificate file (default: sign one and pin it in the invite)")
 	tlsKey := fs.String("tls-key", "", "TLS key file")
+	hooks := fs.Bool("hooks", true, "let members register a URL to be called when they are mentioned")
+	hookCooldown := fs.Duration("hook-cooldown", 3*time.Second, "shortest gap between two calls to the same hook; mentions inside it ride along with the next one")
+	hookPrivate := fs.Bool("hook-private", false, "allow hooks pointing at private or loopback addresses (only for testing on one machine)")
 	quiet := fs.Bool("quiet", false, "only log errors")
 	fs.Usage = func() {
 		fmt.Fprint(os.Stderr, "usage: grokbox serve [flags]\n\nhost one or more chat rooms and print an invite for each.\n\nflags:\n")
@@ -88,19 +91,24 @@ func cmdServe(ctx context.Context, args []string) error {
 		TLS:       *useTLS,
 		TLSCert:   *cert,
 		TLSKey:    *tlsKey,
-		Logf:      logf,
+
+		Hooks:        *hooks,
+		HookCooldown: *hookCooldown,
+		HookPrivate:  *hookPrivate,
+
+		Logf: logf,
 	})
 	if err != nil {
 		return err
 	}
 
 	if !*quiet {
-		printServeBanner(srv, *addr, *store, *open)
+		printServeBanner(srv, *addr, *store, *open, *hooks)
 	}
 	return srv.Run(ctx)
 }
 
-func printServeBanner(srv *server.Server, addr, store string, open bool) {
+func printServeBanner(srv *server.Server, addr, store string, open, hooks bool) {
 	out := os.Stderr
 	fmt.Fprintf(out, "\ngrokbox %s — listening on %s\n", version, addr)
 	fmt.Fprintf(out, "reachable at %s   %s\n", srv.BaseURL(), reachNote(srv.Reach()))
@@ -125,6 +133,11 @@ func printServeBanner(srv *server.Server, addr, store string, open bool) {
 		fmt.Fprintf(out, "  store   %s\n", store)
 	} else {
 		fmt.Fprintf(out, "  store   (memory only — keys and the certificate change on restart)\n")
+	}
+	if hooks {
+		fmt.Fprintf(out, "  hooks   on — a member who registers one is woken when their name is said\n")
+	} else {
+		fmt.Fprintf(out, "  hooks   off — nobody in the room can be woken\n")
 	}
 	if open {
 		fmt.Fprintf(out, "  open    joiners may create new rooms\n")

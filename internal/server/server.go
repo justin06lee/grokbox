@@ -55,6 +55,22 @@ type Config struct {
 	TLSCert string
 	TLSKey  string
 
+	// Hooks lets members register a URL to be called when they are mentioned,
+	// which is what turns an agent in the room from something you have to ask
+	// to look into something that hears its name. Off makes the endpoints
+	// answer 404 and nothing is ever called out to.
+	Hooks bool
+
+	// HookCooldown is the shortest gap between two calls to the same hook.
+	// Mentions arriving inside it are not lost — they collect and ride along
+	// with the next call.
+	HookCooldown time.Duration
+
+	// HookPrivate allows hooks pointing at private and loopback addresses.
+	// Off by default: anyone holding the room key can register a URL, and a
+	// server on a public box should not be a way to knock on its own network.
+	HookPrivate bool
+
 	Logf func(string, ...any)
 }
 
@@ -68,6 +84,9 @@ type Server struct {
 	reach       Reach
 	cert        *tls.Certificate
 	fingerprint string
+
+	hooks    *hooks
+	hookStop context.CancelFunc
 
 	mu    sync.RWMutex
 	rooms map[string]*Room
@@ -86,6 +105,10 @@ func New(cfg Config) (*Server, error) {
 		cfg.Logf = log.New(os.Stderr, "", log.Ltime).Printf
 	}
 
+	if cfg.HookCooldown <= 0 {
+		cfg.HookCooldown = 3 * time.Second
+	}
+
 	s := &Server{cfg: cfg, rooms: map[string]*Room{}, started: time.Now()}
 	s.resolveHost()
 	if err := s.setupTLS(); err != nil {
@@ -98,6 +121,16 @@ func New(cfg Config) (*Server, error) {
 			return nil, err
 		}
 		s.store = st
+	}
+
+	if cfg.Hooks {
+		hookCtx, stop := context.WithCancel(context.Background())
+		s.hookStop = stop
+		s.hooks = newHooks(hookCtx, cfg.HookCooldown, cfg.HookPrivate, s.store, cfg.Logf)
+		if err := s.hooks.load(); err != nil {
+			stop()
+			return nil, err
+		}
 	}
 
 	// Keys already on disk keep working, so invites survive a restart.
@@ -189,6 +222,9 @@ func (s *Server) newRoom(name, key string) *Room {
 	r := newRoom(name, key, s.cfg.History, s.store)
 	if s.store != nil {
 		r.seed(s.store.loadHistory(name, s.cfg.History))
+	}
+	if s.hooks != nil {
+		r.onPost = func(m proto.Message) { s.hooks.deliver(name, m) }
 	}
 	return r
 }
@@ -320,6 +356,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/members", s.handleMembers)
 	mux.HandleFunc("GET /v1/stream", s.handleStream)
 	mux.HandleFunc("GET /v1/health", s.handleHealth)
+	mux.HandleFunc("GET /v1/hooks", s.handleHookList)
+	mux.HandleFunc("POST /v1/hooks", s.handleHookAdd)
+	mux.HandleFunc("DELETE /v1/hooks/{id}", s.handleHookRemove)
+	mux.HandleFunc("POST /v1/hooks/{id}/test", s.handleHookTest)
 	mux.HandleFunc("GET /", s.handleIndex)
 	return mux
 }
@@ -357,10 +397,20 @@ func (s *Server) Run(ctx context.Context) error {
 		shutCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutCtx)
-		if s.store != nil {
-			s.store.Close()
-		}
+		s.Close()
 		return nil
+	}
+}
+
+// Close releases what the server holds: the transcripts it has open and the
+// goroutines waiting to call hooks. Run does it on shutdown; a caller who
+// mounts Handler in a server of their own should do it themselves.
+func (s *Server) Close() {
+	if s.hookStop != nil {
+		s.hookStop()
+	}
+	if s.store != nil {
+		s.store.Close()
 	}
 }
 
@@ -595,6 +645,101 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		if err := rc.Flush(); err != nil {
 			return
 		}
+	}
+}
+
+// ---------------------------------------------------------------- hooks
+
+// hookAuth resolves a request to a room and the name of whoever sent it, and
+// refuses everything when the server was started without hooks.
+func (s *Server) hookAuth(w http.ResponseWriter, r *http.Request) (*Room, string, bool) {
+	if s.hooks == nil {
+		writeErr(w, http.StatusNotFound, "this server was started without hooks — the operator can turn them on with --hooks")
+		return nil, "", false
+	}
+	rm, token, ok := s.auth(w, r)
+	if !ok {
+		return nil, "", false
+	}
+	name := rm.NameOf(token)
+	if name == "" {
+		writeErr(w, http.StatusUnauthorized, "session expired — join the room again")
+		return nil, "", false
+	}
+	return rm, name, true
+}
+
+func (s *Server) handleHookList(w http.ResponseWriter, r *http.Request) {
+	rm, _, ok := s.hookAuth(w, r)
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, proto.HooksResponse{Hooks: s.hooks.list(rm.Name())})
+}
+
+func (s *Server) handleHookAdd(w http.ResponseWriter, r *http.Request) {
+	rm, name, ok := s.hookAuth(w, r)
+	if !ok {
+		return
+	}
+	var req proto.HookAddRequest
+	if !decode(w, r, &req) {
+		return
+	}
+	hk, err := s.hooks.add(rm.Name(), name, req.URL, req.Key, req.Aliases)
+	if err != nil {
+		code := http.StatusBadRequest
+		if errors.Is(err, errTooMany) {
+			code = http.StatusConflict
+		}
+		writeErr(w, code, err.Error())
+		return
+	}
+	s.cfg.Logf("hook  %s in %s -> %s", name, rm.Name(), hostOf(hk.URL))
+	writeJSON(w, http.StatusOK, proto.HookResponse{Hook: hk})
+}
+
+func (s *Server) handleHookRemove(w http.ResponseWriter, r *http.Request) {
+	rm, name, ok := s.hookAuth(w, r)
+	if !ok {
+		return
+	}
+	if err := s.hooks.remove(rm.Name(), r.PathValue("id"), name); err != nil {
+		writeErr(w, hookErrCode(err), err.Error())
+		return
+	}
+	s.cfg.Logf("hook  %s in %s removed", name, rm.Name())
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (s *Server) handleHookTest(w http.ResponseWriter, r *http.Request) {
+	rm, name, ok := s.hookAuth(w, r)
+	if !ok {
+		return
+	}
+	err := s.hooks.fire(rm.Name(), r.PathValue("id"), name,
+		"If you can read this, the room can reach you and you will be woken when somebody says your name.")
+	if err != nil {
+		if code := hookErrCode(err); code != http.StatusBadGateway {
+			writeErr(w, code, err.Error())
+			return
+		}
+		// The hook exists and belongs to them; it is the far end that failed,
+		// which is the thing they asked to find out.
+		writeErr(w, http.StatusBadGateway, "the hook did not answer: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func hookErrCode(err error) int {
+	switch {
+	case errors.Is(err, errNoSuchHook):
+		return http.StatusNotFound
+	case errors.Is(err, errNotYours):
+		return http.StatusForbidden
+	default:
+		return http.StatusBadGateway
 	}
 }
 

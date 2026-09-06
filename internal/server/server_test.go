@@ -25,6 +25,7 @@ func newTestServer(t *testing.T, cfg server.Config) (*server.Server, proto.Invit
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
 	}
+	t.Cleanup(srv.Close)
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 	return srv, proto.Invite{Server: ts.URL, Room: cfg.Rooms[0].Name, Key: cfg.Rooms[0].Key}

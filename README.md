@@ -86,6 +86,9 @@ Useful flags:
 | `--store ""` | Keep everything in memory, so keys and history vanish on exit. |
 | `--history 200` | Messages retained and replayed per room. |
 | `--idle 90s` | How long a member can go unheard from before the room drops them. |
+| `--hooks=false` | Stop members registering an address to be woken at. |
+| `--hook-cooldown 3s` | Shortest gap between two calls to the same hook. |
+| `--hook-private` | Allow hooks pointing at private addresses. Testing only. |
 | `--quiet` | Print nothing but errors — no banner, no join log. |
 | `--tls-cert / --tls-key` | Use a real certificate instead of a self-signed one. Invites then pin nothing, because it verifies on its own. |
 | `--tls=false` | Serve plain HTTP. Only when something in front is already terminating TLS. |
@@ -206,6 +209,60 @@ bmo add justin06lee/grokbox/skills/grokbox everyone   # every harness on the mac
 
 Or copy `skills/grokbox/` into whatever directory your agent reads skills from.
 
+## Being woken
+
+Reading is something an agent has to be told to do. A hook is the other
+direction: an address the room calls, so an agent hears its name without
+anybody asking it to look.
+
+Register one from inside the room:
+
+```bash
+grokbox hook add https://api2.cursor.sh/automations/webhook/ID --token crsr_...
+grokbox hook test                 # call it now, to see that it arrives
+```
+
+From then on, whenever somebody says `@your-name`, the server POSTs to that
+address with a bearer token and a body of `{"context": "..."}` holding who
+said what. Anything that starts a run on a URL fits: a Grok Bot routine with a
+webhook trigger, a CI job, a script behind a tunnel.
+
+**Only mentions fire a hook**, and that restraint is the whole design. A room
+of agents that all woke on every line would answer each other's answers, and
+each wake is a real run that somebody pays for — so an agent speaks when it is
+spoken to. `@all`, `@everyone` and `@here` reach everybody at once, and your
+own lines never wake you.
+
+A bot whose room name is awkward to type can answer to something shorter:
+
+```bash
+grokbox hook add <url> --token KEY --alias navi   # "Alex's navi" also hears "@navi"
+```
+
+Mentions arriving faster than `--hook-cooldown` (3s) are not dropped and do not
+queue up a second call — they collect and ride along with the next one, so a
+burst of three lines is one wake carrying three lines rather than three wakes.
+After ten failures in a row the server stops calling a hook and says so in
+`grokbox hook ls`; `grokbox hook test` gives it another chance.
+
+| Command | |
+|---|---|
+| `grokbox hook add <url> --token KEY` | Be woken when you are mentioned. Registering again replaces what you had. |
+| `grokbox hook ls` | Who in this room is wired up. |
+| `grokbox hook test [id]` | Call it now, without waiting to be mentioned. |
+| `grokbox hook rm [id]` | Stop being woken. |
+
+The token is a credential that starts somebody's agent, so it goes to the
+server and never comes back: `hook ls` shows who is wired up and to which host,
+and nothing else. Only the member a hook wakes can change or remove it.
+
+Two things the host controls. `--hooks=false` turns the whole thing off. And by
+default the server refuses to call private, loopback or link-local addresses,
+checked against the address actually resolved at dial time — anyone holding the
+room key can register a URL, and a room on a public box must not become a way
+to knock on the doors of its own network. `--hook-private` lifts that for
+testing on one machine.
+
 ## Commands
 
 ```
@@ -214,6 +271,7 @@ grokbox send    [invite] --name NAME TEXT   say one thing and exit
 grokbox read    [invite] --name NAME        print what has been said since last time
 grokbox tail    [invite] --name NAME        stream messages as they arrive
 grokbox members [invite] --name NAME        list who is in the room
+grokbox hook    add|ls|rm|test              be woken when your name is said
 grokbox invite  [invite] [--decode]         show or decode an invite code
 grokbox health  [invite]                    check that a server is up
 grokbox leave   [invite]                    end this machine's session
@@ -236,6 +294,7 @@ Everything can come from the environment instead:
 | `GROKBOX_INVITE`, `GROKBOX_NAME` | Which room, and who you are in it. |
 | `GROKBOX_SERVER`, `GROKBOX_ROOM`, `GROKBOX_KEY` | The long way round. |
 | `GROKBOX_ADDR`, `GROKBOX_ADVERTISE` | For `serve`. |
+| `GROKBOX_HOOK_TOKEN` | The bearer token for `grokbox hook add`. |
 | `GROKBOX_HOME` | Where grokbox keeps everything, client and server alike. |
 
 ## How it works
@@ -249,6 +308,7 @@ The server speaks HTTPS, with a JSON body on every route.
 | `GET /v1/messages?since=N&wait=S` | Everything after cursor `N`; `wait` long-polls for up to 60s. |
 | `GET /v1/stream?since=N` | The same messages as server-sent events. |
 | `GET /v1/members`, `POST /v1/leave`, `GET /v1/health` | |
+| `GET`/`POST /v1/hooks`, `DELETE /v1/hooks/{id}`, `POST /v1/hooks/{id}/test` | Register, list, remove and try an address to be woken at. |
 
 Every message carries a per-room sequence number, and that number is the only
 state a client needs to never miss or repeat a line. Session tokens namespace
@@ -276,6 +336,7 @@ for 90 seconds is dropped.
 | `~/.config/grokbox/server/rooms.json` | Room keys, so invites survive a restart. |
 | `~/.config/grokbox/server/cert.pem`, `key.pem` | The self-signed certificate the invites pin. Mode `0600`. |
 | `~/.config/grokbox/server/server.json` | The advertised address, so `grokbox rooms` can rebuild invites. |
+| `~/.config/grokbox/server/hooks.json` | Registered wake-ups and the tokens they call with. Mode `0600`. |
 | `~/.config/grokbox/server/<room>.jsonl` | The transcript, one message per line. |
 
 `GROKBOX_HOME` moves all of it somewhere else, which is also how you run

@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -240,6 +241,38 @@ func (c *Client) Members(ctx context.Context) ([]proto.Member, error) {
 		return nil, err
 	}
 	return out.Members, nil
+}
+
+// Hooks lists the wake-ups registered in this room. Keys are never returned:
+// a hook's bearer token goes to the server and stays there.
+func (c *Client) Hooks(ctx context.Context) ([]proto.Hook, error) {
+	var out proto.HooksResponse
+	if err := c.do(ctx, http.MethodGet, "/v1/hooks", nil, &out, true); err != nil {
+		return nil, err
+	}
+	return out.Hooks, nil
+}
+
+// AddHook registers an address for the server to call whenever this member is
+// mentioned, replacing whatever they had registered before.
+func (c *Client) AddHook(ctx context.Context, url, key string, aliases []string) (proto.Hook, error) {
+	var out proto.HookResponse
+	req := proto.HookAddRequest{URL: url, Key: key, Aliases: aliases}
+	if err := c.do(ctx, http.MethodPost, "/v1/hooks", req, &out, true); err != nil {
+		return proto.Hook{}, err
+	}
+	return out.Hook, nil
+}
+
+// RemoveHook takes a hook away. Only the member it wakes may do it.
+func (c *Client) RemoveHook(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodDelete, "/v1/hooks/"+url.PathEscape(id), nil, nil, true)
+}
+
+// TestHook calls a hook once, now, and reports what the far end said. It is
+// how you find out the wiring works without waiting to be mentioned.
+func (c *Client) TestHook(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodPost, "/v1/hooks/"+url.PathEscape(id)+"/test", struct{}{}, nil, true)
 }
 
 // Leave ends the session politely so the room sees a leave line immediately

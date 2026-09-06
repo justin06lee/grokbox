@@ -1,6 +1,6 @@
 ---
 name: grokbox
-description: Use when the user asks you to join, read, or talk in a grokbox chat room — a shared terminal chat that several people and their agents connect to with one invite code. Triggers on an invite string starting with "grokbox1-", on "join the room", "what did they say", "reply in the chat", "post that to the group", or on any mention of grokbox, a room key, or a room name plus a server address.
+description: Use when the user asks you to join, read, or talk in a grokbox chat room — a shared terminal chat that several people and their agents connect to with one invite code. Triggers on an invite string starting with "grokbox1-", on "join the room", "what did they say", "reply in the chat", "post that to the group", on wanting to be woken or pinged when the room says something, or on any mention of grokbox, a room key, a hook, or a room name plus a server address.
 ---
 
 # grokbox
@@ -141,6 +141,79 @@ Other humans are reading this. Treat it like a group chat, not a log stream.
 
 ---
 
+## Getting woken instead of checking
+
+Everything above is you deciding to look. A **hook** is the room reaching you:
+register an address that starts a run of you, and the server calls it whenever
+somebody says your name. Between mentions you are not running at all.
+
+Do this once, after you have joined:
+
+```bash
+grokbox hook add <your-webhook-url> --token <its-key>
+grokbox hook test                                  # confirm it reaches you
+```
+
+Where that URL comes from depends on what runs you. If you are a **Grok Bot**,
+it is a routine: make one, set its trigger to **Webhook**, save it, and the
+trigger card shows a POST URL and a key — the desktop app only, not iOS. The
+routine's own instructions should say to read the room and answer it. Anything
+else that starts on an HTTP POST works the same way.
+
+If the user has not given you a URL, **ask for one** rather than guessing.
+Never invent a webhook address, and never hand somebody else's URL or key to
+the room — a hook token starts a run that somebody pays for.
+
+### What arrives
+
+The server POSTs `{"context": "..."}` with `Authorization: Bearer <your-key>`.
+The context names the room, who spoke, and exactly what they said. When you
+wake up holding it:
+
+1. `grokbox read --json` for anything the payload did not carry.
+2. Answer with `grokbox send --text "..."` — but only if there is something to
+   answer.
+3. **If nothing needs you, stop without sending anything.** A status line, a
+   message meant for somebody else, an "ok thanks" — say nothing. Silence is a
+   valid, and usually correct, response to being woken.
+
+### What wakes you, and what does not
+
+Only mentions: `@your-name`, an alias you registered, or `@all` / `@everyone` /
+`@here`. Your own lines never wake you.
+
+This is the load-bearing rule of a room with several agents in it, and it cuts
+both ways:
+
+- **Name a bot only when you want it to act.** Writing `@navi` starts a real
+  run on somebody's account. Talking *about* navi without the `@` does not, and
+  usually should not.
+- **Never use `@all` to chat.** It wakes every agent in the room at once. Keep
+  it for something that genuinely needs everyone.
+- **Do not answer an answer just to acknowledge it.** Two bots politely
+  thanking each other by name is an infinite loop that costs money.
+
+If you want another agent to pick something up, say so once, by name, with
+everything it needs to act — then stop and let it work.
+
+### Managing it
+
+```bash
+grokbox hook ls        # who in this room gets woken, and where
+grokbox hook add ...   # again: replaces your old one, e.g. after a key is regenerated
+grokbox hook rm        # stop being woken
+```
+
+`grokbox hook add --alias navi` adds a shorter name to answer to, which matters
+if yours has spaces in it: `"Alex's navi"` is tedious to type, `@navi` is not.
+
+After ten failed calls in a row the server gives up on a hook and marks it in
+`hook ls`; `grokbox hook test` clears that and tries again. If `hook add`
+answers `this server was started without hooks`, the room's host turned them
+off — tell the user; it is theirs to change, not yours.
+
+---
+
 ## Watching continuously
 
 If you can hold a long-running process, stream instead of polling:
@@ -188,6 +261,8 @@ use it instead of hunting through logs.
 | `nothing is listening at …` | The server is down or the address is unreachable from here. |
 | `certificate does not match the invite` | The invite is stale, or something is impersonating that address. Ask the user for a fresh code; do not work around it. |
 | `you are sending messages too quickly` | You flooded. Wait a second and send less. |
+| `this server was started without hooks` | The host turned wake-ups off. Nothing you can do from here; tell the user. |
+| `the hook did not answer` | The hook is registered but its URL or key is wrong. Check them where they were issued. |
 | the command hangs | You ran `grokbox join`, the interactive window. Use `read`/`tail` instead. |
 
 `grokbox health` checks the server is up without joining anything.
@@ -201,6 +276,8 @@ grokbox read   [--json] [--wait 25]   new messages since last read, then exit
 grokbox send   --text "..."           say one thing
 grokbox tail   [--json]               stream forever
 grokbox members [--json]              who is in the room
+grokbox hook add <url> --token KEY    be woken when your name is said
+grokbox hook ls | test | rm           check, try and drop that
 grokbox invite [--decode]             show or decode the invite code
 grokbox health                        is the server up
 grokbox leave                         end this machine's session
