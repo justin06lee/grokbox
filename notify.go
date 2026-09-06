@@ -5,11 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 
+	"github.com/justin06lee/grokbox/internal/desktop"
 	"github.com/justin06lee/grokbox/internal/proto"
 )
 
@@ -131,74 +130,21 @@ func (n *notifier) raise(m proto.Message) {
 		fmt.Println(line)
 		return
 	}
-	if err := n.show(m.From+" in "+n.room, body); err != nil {
+	note := desktop.Notification{
+		Title:    "grokbox",
+		Subtitle: m.From + " in " + n.room,
+		Body:     body,
+		Group:    "grokbox-" + n.room,
+		Silent:   n.silent,
+	}
+	// A notification you can click to open the room is worth more than one
+	// you cannot; terminal-notifier is the only thing here that can do it.
+	if self, err := os.Executable(); err == nil && n.name != "" {
+		note.Exec = []string{self, "window", "--name", n.name}
+	}
+	if err := desktop.Show(note); err != nil {
 		// A desktop that will not show a notification is not a reason to stop
 		// watching the room; say it once on the terminal instead.
 		fmt.Fprintln(os.Stderr, line)
 	}
-}
-
-func (n *notifier) show(subtitle, body string) error {
-	switch runtime.GOOS {
-	case "darwin":
-		return n.showMac(subtitle, body)
-	case "windows":
-		return n.showWindows(subtitle, body)
-	default:
-		return n.showUnix(subtitle, body)
-	}
-}
-
-// showMac prefers terminal-notifier when it is installed, because a
-// notification you can click to open the room is worth more than one you
-// cannot. Otherwise osascript, which every Mac has.
-func (n *notifier) showMac(subtitle, body string) error {
-	if tn, err := exec.LookPath("terminal-notifier"); err == nil {
-		args := []string{"-title", "grokbox", "-subtitle", subtitle, "-message", body, "-group", "grokbox-" + n.room}
-		if self, err := os.Executable(); err == nil && n.name != "" {
-			args = append(args, "-execute", shellJoin([]string{self, "window", "--name", n.name}))
-		}
-		if !n.silent {
-			args = append(args, "-sound", "Ping")
-		}
-		return exec.Command(tn, args...).Run()
-	}
-
-	sound := ""
-	if !n.silent {
-		sound = " sound name \"Ping\""
-	}
-	osa := fmt.Sprintf("display notification %s with title \"grokbox\" subtitle %s%s",
-		appleString(body), appleString(subtitle), sound)
-	return exec.Command("osascript", "-e", osa).Run()
-}
-
-func (n *notifier) showUnix(subtitle, body string) error {
-	send, err := exec.LookPath("notify-send")
-	if err != nil {
-		return err
-	}
-	return exec.Command(send, "-a", "grokbox", subtitle, body).Run()
-}
-
-func (n *notifier) showWindows(subtitle, body string) error {
-	ps, err := exec.LookPath("powershell")
-	if err != nil {
-		return err
-	}
-	// The toast APIs need a module nobody has by default; a balloon from the
-	// notification area needs nothing and shows up in the same place.
-	script := `[reflection.assembly]::LoadWithPartialName("System.Windows.Forms") > $null
-$n = New-Object System.Windows.Forms.NotifyIcon
-$n.Icon = [System.Drawing.SystemIcons]::Information
-$n.BalloonTipTitle = ` + psQuote(subtitle) + `
-$n.BalloonTipText = ` + psQuote(body) + `
-$n.Visible = $true
-$n.ShowBalloonTip(6000)
-Start-Sleep -Seconds 7`
-	return exec.Command(ps, "-NoProfile", "-Command", script).Run()
-}
-
-func psQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }
