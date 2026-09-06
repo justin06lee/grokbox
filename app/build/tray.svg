@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" width="44" height="44" role="img" aria-label="grokbox">
+  <mask id="crate">
+    <rect width="44" height="44" fill="black"/>
+    <rect x="3" y="9" width="38" height="7" rx="2" fill="white"/>
+    <rect x="5" y="18" width="34" height="19" rx="2" fill="white"/>
+    <rect x="16" y="22" width="12" height="11" rx="2.5" fill="black"/>
+    <rect x="20" y="24.5" width="4" height="6" rx="1.2" fill="white"/>
+  </mask>
+  <rect width="44" height="44" fill="black" mask="url(#crate)"/>
+</svg>

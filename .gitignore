@@ -2,6 +2,8 @@
 /bin/
 /dist/
 /grokbox
+/app/bin/
+/app/app
 
 # local state
 *.jsonl

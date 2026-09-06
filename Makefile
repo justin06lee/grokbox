@@ -5,6 +5,8 @@
 #   make install  put grokbox on $PATH
 #   make update   stop any running server, reinstall, start it again
 #   make service  run it as a systemd service, surviving reboots (Linux)
+#
+#   make app      build the desktop app, install it, and open it
 
 BINARY  := grokbox
 VERSION := $(shell git describe --tags --dirty --always 2>/dev/null || echo dev)
@@ -17,7 +19,8 @@ BINDIR := $(PREFIX)/bin
 # Command lines of the servers `make update` stopped, so it can start them again.
 RESTART := .make-restart
 
-.PHONY: all build install uninstall update service unservice test race fmt vet dist clean stop-servers start-servers check-path
+.PHONY: all build install uninstall update service unservice test race fmt vet dist clean stop-servers start-servers check-path \
+        app app-build app-bundle app-install app-quit app-dist app-clean
 
 all: build install check-path
 	@echo
@@ -135,5 +138,125 @@ dist: clean
 	done
 	@echo "  binaries in ./dist"
 
-clean:
+clean: app-clean
 	rm -rf bin dist $(RESTART)
+
+# ---------------------------------------------------------- the desktop app
+#
+# The app is a separate Go module on purpose: it pulls in a GUI framework, and
+# `go install github.com/justin06lee/grokbox@latest` must stay a small binary
+# whose only dependency outside the standard library is golang.org/x/term.
+#
+# It links the same internal/client the CLI does, so there is one implementation
+# of the protocol and one of the certificate pinning.
+
+APP_NAME   := grokbox
+APP_ID     := com.grokbox.app
+APP_DIR    := app
+APP_BUNDLE := $(APP_DIR)/bin/$(APP_NAME).app
+# 13.0 is what the Wails Objective-C sources are built for; saying so here is
+# what silences a screenful of linker warnings about mismatched versions.
+export MACOSX_DEPLOYMENT_TARGET := 13.0
+
+app: app-quit app-build app-bundle app-install
+	@echo
+	@echo "  $(APP_NAME) $(VERSION) — the desktop app"
+ifeq ($(shell uname -s),Darwin)
+	@open -a /Applications/$(APP_NAME).app
+	@echo "  opened from /Applications. It stays in the menu bar when you close the window."
+else
+	@echo "  installed to $(BINDIR)/$(APP_NAME)-app"
+endif
+	@echo
+
+app-build:
+	@mkdir -p $(APP_DIR)/bin
+	cd $(APP_DIR) && go build -trimpath -ldflags '$(LDFLAGS)' -o bin/$(APP_NAME) .
+
+# macOS wants a bundle, not a binary: notifications need a bundle identifier,
+# and the dock badge needs something to sit on. Everywhere else this is a no-op.
+app-bundle:
+ifeq ($(shell uname -s),Darwin)
+	@rm -rf $(APP_BUNDLE) $(APP_DIR)/bin/icon.iconset
+	@mkdir -p $(APP_BUNDLE)/Contents/MacOS $(APP_BUNDLE)/Contents/Resources
+	@cp $(APP_DIR)/bin/$(APP_NAME) $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
+	@mkdir -p $(APP_DIR)/bin/icon.iconset
+	@for size in 16 32 128 256 512; do \
+		sips -z $$size $$size $(APP_DIR)/build/icon.png \
+			--out $(APP_DIR)/bin/icon.iconset/icon_$${size}x$${size}.png >/dev/null; \
+		sips -z $$(($$size * 2)) $$(($$size * 2)) $(APP_DIR)/build/icon.png \
+			--out $(APP_DIR)/bin/icon.iconset/icon_$${size}x$${size}@2x.png >/dev/null; \
+	done
+	@iconutil -c icns $(APP_DIR)/bin/icon.iconset -o $(APP_BUNDLE)/Contents/Resources/icon.icns
+	@printf '%s\n' \
+		'<?xml version="1.0" encoding="UTF-8"?>' \
+		'<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+		'<plist version="1.0"><dict>' \
+		'  <key>CFBundlePackageType</key><string>APPL</string>' \
+		'  <key>CFBundleName</key><string>$(APP_NAME)</string>' \
+		'  <key>CFBundleDisplayName</key><string>$(APP_NAME)</string>' \
+		'  <key>CFBundleExecutable</key><string>$(APP_NAME)</string>' \
+		'  <key>CFBundleIdentifier</key><string>$(APP_ID)</string>' \
+		'  <key>CFBundleIconFile</key><string>icon</string>' \
+		'  <key>CFBundleVersion</key><string>$(VERSION)</string>' \
+		'  <key>CFBundleShortVersionString</key><string>$(VERSION)</string>' \
+		'  <key>LSMinimumSystemVersion</key><string>13.0</string>' \
+		'  <key>NSHighResolutionCapable</key><true/>' \
+		'</dict></plist>' \
+		> $(APP_BUNDLE)/Contents/Info.plist
+	@rm -rf $(APP_DIR)/bin/icon.iconset
+	@codesign --force --sign - --identifier $(APP_ID) $(APP_BUNDLE) 2>/dev/null \
+		|| echo "  note: could not sign the bundle; notifications will use the fallback"
+endif
+
+# The old bundle goes before the new one arrives: macOS keys an app's
+# notification permission to its bundle id and signature, and leaving the stale
+# copy in place is what makes a rebuilt app stop being allowed to notify.
+app-install: app-bundle
+ifeq ($(shell uname -s),Darwin)
+	@rm -rf /Applications/$(APP_NAME).app
+	@cp -R $(APP_BUNDLE) /Applications/$(APP_NAME).app
+else
+	@mkdir -p $(BINDIR)
+	install -m 0755 $(APP_DIR)/bin/$(APP_NAME) $(BINDIR)/$(APP_NAME)-app
+	@mkdir -p $(HOME)/.local/share/applications $(HOME)/.local/share/icons
+	@cp $(APP_DIR)/build/icon.png $(HOME)/.local/share/icons/$(APP_NAME).png
+	@printf '%s\n' \
+		'[Desktop Entry]' \
+		'Type=Application' \
+		'Name=grokbox' \
+		'Comment=A chat room behind a key' \
+		'Exec=$(BINDIR)/$(APP_NAME)-app' \
+		'Icon=$(APP_NAME)' \
+		'Categories=Network;InstantMessaging;' \
+		> $(HOME)/.local/share/applications/$(APP_NAME).desktop
+endif
+
+app-quit:
+ifeq ($(shell uname -s),Darwin)
+	@osascript -e 'quit app "$(APP_NAME)"' 2>/dev/null || true
+	@pkill -f "$(APP_NAME).app/Contents/MacOS/$(APP_NAME)" 2>/dev/null || true
+else
+	@pkill -f "$(APP_NAME)-app" 2>/dev/null || true
+endif
+
+# Windows cross-compiles from anywhere because its webview binding is pure Go.
+# Linux does not: it needs cgo against webkit2gtk, so that one is built on Linux
+# or not at all. Saying so here beats a target that silently produces nothing.
+app-dist: app-build app-bundle
+	@mkdir -p dist
+ifeq ($(shell uname -s),Darwin)
+	@cd $(APP_DIR)/bin && zip -qry ../../dist/$(APP_NAME)-app-macos.zip $(APP_NAME).app
+	@echo "  dist/$(APP_NAME)-app-macos.zip"
+endif
+	@GOOS=windows GOARCH=amd64 CGO_ENABLED=0 sh -c 'cd $(APP_DIR) && go build -trimpath -ldflags "$(LDFLAGS)" -o ../dist/$(APP_NAME)-app-windows-amd64.exe .'
+	@echo "  dist/$(APP_NAME)-app-windows-amd64.exe"
+ifeq ($(shell uname -s),Linux)
+	@cp $(APP_DIR)/bin/$(APP_NAME) dist/$(APP_NAME)-app-linux-$(shell go env GOARCH)
+	@echo "  dist/$(APP_NAME)-app-linux-$(shell go env GOARCH)"
+else
+	@echo "  linux: build on a Linux machine — its webview needs cgo and webkit2gtk headers"
+endif
+
+app-clean:
+	rm -rf $(APP_DIR)/bin
