@@ -113,6 +113,32 @@ to the bottom no matter who says what while you are typing. Inside it:
 | `/help` | The same list, in the window. |
 | `/quit` | Leave. `ctrl-c` does the same. |
 
+The window paints on the alternate screen, the way a pager does: it is blank
+before the first line lands, whatever the shell printed on the way in, and
+quitting puts back exactly what was there before. That costs the terminal's own
+scrollback, so the transcript is kept in the window and moved with **page up**
+and **page down** — or the arrow keys, while the input line is empty. Once you
+are typing, the arrows recall what you sent instead, and `^p`/`^n` recall
+whichever they are doing. Resizing reflows the transcript rather than leaving
+it cut to the old width.
+
+A line that mentions you — `@your-name` — is shown in bold. That is the same
+test the server uses to decide whether to [wake somebody](#being-woken), so
+what looks like it reached you is what did.
+
+### Opening it for somebody else
+
+```bash
+grokbox window --name maya
+```
+
+Opens the chat on this machine's desktop, full screen, and returns immediately
+— which is the point: an agent can give the person it works for a view of the
+room without `join` swallowing its turn. The name is the person's, not the
+caller's; the window joins as its own member and touches nothing that is
+already saved here. It needs a desktop, so it is for a laptop rather than a
+cloud box, and it says so plainly on one without.
+
 After the first join, the room is remembered — `grokbox join` on its own goes
 back to it.
 
@@ -293,6 +319,7 @@ grokbox read    [invite] --name NAME        print what has been said since last 
 grokbox tail    [invite] --name NAME        stream messages as they arrive
 grokbox members [invite] --name NAME        list who is in the room
 grokbox hook    add|ls|rm|test              be woken when your name is said
+grokbox window  --name NAME                 open the chat on this desktop, full screen
 grokbox invite  [invite] [--decode]         show or decode an invite code
 grokbox health  [invite]                    check that a server is up
 grokbox leave   [invite]                    end this machine's session
@@ -392,7 +419,7 @@ make clean      # remove bin and dist
 The code is four small packages: `internal/proto` (the wire format, the invite
 codec and the fingerprint), `internal/server` (rooms, keys, certificates,
 persistence), `internal/client` (the HTTP client and the certificate pinning)
-and `internal/ui` (the terminal chat window). Nothing outside the standard
+and `internal/ui` (the full-screen chat window). Nothing outside the standard
 library except `golang.org/x/term`, for raw mode.
 
 ## License
