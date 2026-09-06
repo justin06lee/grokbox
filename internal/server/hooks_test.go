@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -423,5 +424,73 @@ func TestHooksSurviveARestart(t *testing.T) {
 	}
 	if body := w.next(t); !strings.Contains(body, "are you still there?") {
 		t.Errorf("the restored hook carried the wrong line:\n%s", body)
+	}
+}
+
+func TestHookRetriesAHiccupButNotARefusal(t *testing.T) {
+	ctx := context.Background()
+	_, in := hookServer(t, time.Hour)
+	w := newWakes(t)
+	w.mu.Lock()
+	w.status = http.StatusBadGateway
+	w.mu.Unlock()
+
+	bob := join(t, in, "bob")
+	hk, err := bob.AddHook(ctx, w.URL, "k", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A 5xx is the far end having a moment, so it is worth asking twice.
+	if err := bob.TestHook(ctx, hk.ID); err == nil {
+		t.Fatal("a webhook that answered 502 twice was reported as working")
+	}
+	if n := w.count(); n != 2 {
+		t.Errorf("a 502 was attempted %d times, want 2", n)
+	}
+}
+
+func TestARoomHoldsOnlySoManyHooks(t *testing.T) {
+	ctx := context.Background()
+	_, in := hookServer(t, time.Hour)
+	w := newWakes(t)
+
+	// Documented as 32. Each member gets one, so this is 32 members with a
+	// hook and one more who cannot have one.
+	var first *client.Client
+	for i := 0; i < proto.MaxRoomHook; i++ {
+		c := join(t, in, fmt.Sprintf("bot-%d", i))
+		if _, err := c.AddHook(ctx, w.URL, "k", nil); err != nil {
+			t.Fatalf("bot-%d could not register: %v", i, err)
+		}
+		if i == 0 {
+			first = c
+		}
+	}
+	last := join(t, in, "one-too-many")
+	if _, err := last.AddHook(ctx, w.URL, "k", nil); err == nil {
+		t.Fatalf("a %dth hook was accepted", proto.MaxRoomHook+1)
+	}
+
+	// Somebody already registered may still correct their own.
+	if _, err := first.AddHook(ctx, w.URL, "k2", nil); err != nil {
+		t.Errorf("a full room stopped a member replacing their own hook: %v", err)
+	}
+}
+
+func TestAHookAnswersToAtMostEightAliases(t *testing.T) {
+	ctx := context.Background()
+	_, in := hookServer(t, time.Hour)
+	w := newWakes(t)
+	bob := join(t, in, "bob")
+
+	eight := make([]string, proto.MaxHookAlias)
+	for i := range eight {
+		eight[i] = fmt.Sprintf("alias%d", i)
+	}
+	if _, err := bob.AddHook(ctx, w.URL, "k", eight); err != nil {
+		t.Fatalf("%d aliases were refused: %v", len(eight), err)
+	}
+	if _, err := bob.AddHook(ctx, w.URL, "k", append(eight, "one-more")); err == nil {
+		t.Errorf("%d aliases were accepted", len(eight)+1)
 	}
 }

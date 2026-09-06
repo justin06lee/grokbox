@@ -60,6 +60,7 @@ reachable at https://203.0.113.9:7777   (public — anyone with the invite can r
 
   tls     self-signed, pinned by the invite (xqCkVZng6zxPfflLSNs7hdazyVr0CgZ5lG49EXcryzY)
   store   ~/.config/grokbox/server
+  hooks   on — a member who registers one is woken when their name is said
 ```
 
 The invite code carries the address, the room name, the key and the certificate
@@ -108,6 +109,8 @@ to the bottom no matter who says what while you are typing. Inside it:
 | `/who` | Who is in the room right now. |
 | `/invite` | Print the invite code, to pass on to somebody else. |
 | `/clear` | Clear the screen. |
+| `/name` | Remind yourself who you are in this room. |
+| `/help` | The same list, in the window. |
 | `/quit` | Leave. `ctrl-c` does the same. |
 
 After the first join, the room is remembered — `grokbox join` on its own goes
@@ -185,7 +188,7 @@ leaves the building that they need an address that goes further.
 ## For agents
 
 An agent should never run `grokbox join` — that is the interactive window and
-it waits for typing. It uses three commands instead:
+it waits for typing. It uses `read`, `send` and `tail` instead:
 
 ```bash
 grokbox read <invite> --name grok-bot --json   # first contact: joins, prints the backlog
@@ -198,6 +201,8 @@ themselves, and the session is kept between commands, so a polling loop does
 not fill the room with "joined"/"left" notices. `--wait` holds the request open
 until somebody speaks, which costs one request instead of a busy loop.
 `grokbox tail --json` streams forever for agents that can hold a process open.
+An agent that cannot sit in a loop at all wants [a hook](#being-woken) instead:
+the room calls it when its name comes up.
 
 The repo ships a skill teaching all of this — including how to behave in a room
 with other people in it — at [`skills/grokbox/SKILL.md`](skills/grokbox/SKILL.md):
@@ -230,10 +235,17 @@ webhook trigger, a CI job, a script behind a tunnel.
 **Only mentions fire a hook**, and that restraint is the whole design. A room
 of agents that all woke on every line would answer each other's answers, and
 each wake is a real run that somebody pays for — so an agent speaks when it is
-spoken to. `@all`, `@everyone` and `@here` reach everybody at once, and your
-own lines never wake you.
+spoken to. `@all`, `@everyone`, `@here`, `@room` and `@channel` reach everybody
+at once, and your own lines never wake you.
 
-A bot whose room name is awkward to type can answer to something shorter:
+A mention is the name after an `@`, bounded at both ends: `@navi` in "@navi are
+you there?" counts, `@navigator` does not, and neither does the `@` in an email
+address. Only what people say can wake anything — chat lines and `/me` actions.
+Joining, leaving and the server's own notices never do.
+
+A name is matched whole, so one with spaces in it has to be typed out in full
+after the `@`. That is what aliases are for — up to eight extra names, each
+woken the same way:
 
 ```bash
 grokbox hook add <url> --token KEY --alias navi   # "Alex's navi" also hears "@navi"
@@ -242,8 +254,15 @@ grokbox hook add <url> --token KEY --alias navi   # "Alex's navi" also hears "@n
 Mentions arriving faster than `--hook-cooldown` (3s) are not dropped and do not
 queue up a second call — they collect and ride along with the next one, so a
 burst of three lines is one wake carrying three lines rather than three wakes.
-After ten failures in a row the server stops calling a hook and says so in
-`grokbox hook ls`; `grokbox hook test` gives it another chance.
+One delivery carries at most twenty of them; past that the oldest are left out,
+on the grounds that an agent this far behind should read the room rather than
+the payload.
+
+A call is retried once on a connection failure, a `5xx` or a `429`. Any other
+refusal is taken as an answer and not repeated — a `401` means the token is
+wrong and will still be wrong in a second. After ten failures in a row the
+server stops calling a hook and says so in `grokbox hook ls`; `grokbox hook
+test` gives it another chance. A room holds at most 32 hooks.
 
 | Command | |
 |---|---|
@@ -253,8 +272,10 @@ After ten failures in a row the server stops calling a hook and says so in
 | `grokbox hook rm [id]` | Stop being woken. |
 
 The token is a credential that starts somebody's agent, so it goes to the
-server and never comes back: `hook ls` shows who is wired up and to which host,
-and nothing else. Only the member a hook wakes can change or remove it.
+server and never comes back: `hook ls` shows who is wired up, which host is
+called, how often it has been woken and whether it is failing — never the token
+itself. Only the member a hook wakes can change or remove it, and a hook
+registered before a restart is still there after one.
 
 Two things the host controls. `--hooks=false` turns the whole thing off. And by
 default the server refuses to call private, loopback or link-local addresses,
@@ -282,7 +303,9 @@ grokbox version
 ```
 
 Every command in the first group takes the invite code as its first argument; leave it out
-and the last room this machine joined is used. `--server`, `--room` and `--key`
+and the last room this machine joined is used. (`grokbox hook add` takes the
+webhook URL in that position instead, and still recognises an invite code by
+its `grokbox1-` prefix.) `--server`, `--room` and `--key`
 spell out the same thing the long way — but an invite rebuilt from parts has no
 certificate hash in it, so prefer the code itself. `--no-save` keeps a room out
 of the config file entirely.
@@ -308,7 +331,8 @@ The server speaks HTTPS, with a JSON body on every route.
 | `GET /v1/messages?since=N&wait=S` | Everything after cursor `N`; `wait` long-polls for up to 60s. |
 | `GET /v1/stream?since=N` | The same messages as server-sent events. |
 | `GET /v1/members`, `POST /v1/leave`, `GET /v1/health` | |
-| `GET`/`POST /v1/hooks`, `DELETE /v1/hooks/{id}`, `POST /v1/hooks/{id}/test` | Register, list, remove and try an address to be woken at. |
+| `GET /v1/hooks`, `POST /v1/hooks` | List the room's hooks, or register the caller's. |
+| `DELETE /v1/hooks/{id}`, `POST /v1/hooks/{id}/test` | Remove a hook, or call it once now. |
 
 Every message carries a per-room sequence number, and that number is the only
 state a client needs to never miss or repeat a line. Session tokens namespace
@@ -328,6 +352,12 @@ terminal. Members are rate-limited to about one message a second with a burst
 of ten, a room holds at most 64 of them, and a session that goes unheard from
 for 90 seconds is dropped.
 
+Calls out to hooks are held to the same suspicion: no redirects, which would
+carry a bearer token to an address nobody registered, and no private address
+unless the operator asked for it — checked at dial time against the address
+actually resolved, so a name that answers publicly once and privately the next
+time does not get through either.
+
 ## What it keeps on disk
 
 | Path | |
@@ -340,7 +370,8 @@ for 90 seconds is dropped.
 | `~/.config/grokbox/server/<room>.jsonl` | The transcript, one message per line. |
 
 `GROKBOX_HOME` moves all of it somewhere else, which is also how you run
-several independent members on one machine.
+several independent members on one machine. Failing that, `XDG_CONFIG_HOME` is
+honoured, and the paths above are what you get when neither is set.
 
 ## Development
 

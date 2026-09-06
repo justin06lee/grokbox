@@ -158,6 +158,9 @@ func TestMentions(t *testing.T) {
 		{"@all standup in five", "navi", nil, true, "@all wakes everybody"},
 		{"@everyone ^", "navi", nil, true, "so does @everyone"},
 		{"@here", "navi", nil, true, "and @here"},
+		{"@room anyone about?", "navi", nil, true, "and @room"},
+		{"@channel heads up", "navi", nil, true, "and @channel"},
+		{"@ALL shout", "navi", nil, true, "case does not matter there either"},
 		{"is it @allowed?", "navi", nil, false, "@all does not match a longer word"},
 	}
 	for _, c := range cases {
