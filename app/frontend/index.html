@@ -23,14 +23,18 @@
       <nav id="rooms" class="rooms"></nav>
 
       <footer class="side-foot">
+        <button id="hidden-row" class="foot-row" type="button" hidden>
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 10.7a2 2 0 0 0 2.7 2.9"/><path d="M9.4 5.2A9.7 9.7 0 0 1 12 5c5 0 9 4.5 9 7a11 11 0 0 1-2.2 3.3M6.3 6.7C3.9 8.3 3 10.6 3 12c0 2.5 4 7 9 7 1.4 0 2.7-.3 3.8-.9"/></svg>
+          <span id="hidden-label">Hidden rooms</span>
+        </button>
         <button id="foot-join" class="foot-row" type="button">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 11h18M12 7V4M8.5 4h7"/></svg>
           <span>Join a room</span>
         </button>
-        <div class="foot-row static" id="foot-me">
-          <span class="avatar small" id="me-avatar"></span>
-          <span class="foot-who"><b id="me-name">grokbox</b><span id="version"></span></span>
-        </div>
+        <button id="foot-me" class="foot-row me-row" type="button" title="Your picture">
+          <span class="avatar big" id="me-avatar"></span>
+          <span class="foot-who"><b id="me-name">Not in a room</b><span id="version"></span></span>
+        </button>
       </footer>
     </aside>
 
@@ -40,8 +44,8 @@
         <h1 id="room-name"></h1>
         <span id="room-sub" class="head-note"></span>
         <div class="head-actions">
-          <button id="members-btn" class="icon-btn" title="Who is in the room" aria-label="Who is in the room">
-            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/><circle cx="10" cy="8" r="3.2"/><path d="M20 19v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.4 5.2a3.2 3.2 0 0 1 0 5.6"/></svg>
+          <button id="settings-btn" class="icon-btn" title="Room settings" aria-label="Room settings">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/></svg>
           </button>
         </div>
       </header>
@@ -68,29 +72,86 @@
       </form>
     </main>
 
-    <aside id="members" class="members" hidden>
-      <header class="members-head">Members</header>
-      <ul id="member-list"></ul>
+    <!-- The settings pane. Grok Bot calls this the info pane and slides it in
+         from the right over the conversation; the room's whole identity, the
+         thing you hand somebody to get them in, and the way out all live here. -->
+    <aside id="pane" class="pane" hidden>
+      <header class="pane-head">
+        <span class="pane-title">Settings</span>
+        <button id="pane-close" class="icon-btn" title="Close" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m13 6 6 6-6 6M19 12H5"/></svg>
+        </button>
+      </header>
+
+      <div class="pane-body">
+        <button id="pane-avatar-btn" class="pane-avatar" type="button" title="Change the picture">
+          <span class="avatar huge" id="pane-avatar"></span>
+          <span class="pane-avatar-hint">Change</span>
+        </button>
+
+        <label class="pane-label" for="pane-nick">Name</label>
+        <input id="pane-nick" class="pane-input" type="text" spellcheck="false" />
+        <p class="pane-help" id="pane-realname"></p>
+
+        <label class="pane-label" for="pane-you">You are</label>
+        <input id="pane-you" class="pane-input" type="text" readonly />
+
+        <div class="pane-label-row">
+          <label class="pane-label" for="pane-invite">Invite code</label>
+          <button id="pane-copy" class="ghost-btn small" type="button">Copy</button>
+        </div>
+        <textarea id="pane-invite" class="pane-input mono" rows="3" readonly spellcheck="false"></textarea>
+        <p class="pane-help">Certificate <span id="pane-fp" class="mono"></span></p>
+
+        <div class="pane-switch">
+          <div class="pane-switch-text">
+            <b>Notifications</b>
+            <span>Get told when somebody says your name in this room</span>
+          </div>
+          <label class="switch"><input id="pane-notify" type="checkbox" /><span></span></label>
+        </div>
+
+        <div class="pane-section">Members</div>
+        <ul id="member-list" class="member-list"></ul>
+
+        <button id="pane-leave" class="danger-btn" type="button">Leave room</button>
+      </div>
     </aside>
+  </div>
+
+  <!-- Right-click on a room. Grok Bot's menu, with the items a room has. -->
+  <div id="menu" class="menu" hidden role="menu"></div>
+
+  <!-- The avatar picker, anchored under whatever it is dressing. -->
+  <div id="pop" class="pop" hidden>
+    <div class="pop-tabs">
+      <button class="pop-tab on" data-tab="bot" type="button">Bot</button>
+      <button class="pop-tab" data-tab="shuffle" type="button">Shuffle</button>
+      <button class="pop-tab" data-tab="upload" type="button">Upload</button>
+      <button class="pop-tab reset" data-tab="reset" type="button">Reset</button>
+    </div>
+    <div class="pop-body">
+      <div id="pop-shapes" class="pop-shapes"></div>
+      <div id="pop-colors" class="pop-colors"></div>
+    </div>
   </div>
 
   <div id="modal" class="modal" hidden>
     <form class="sheet" id="join-form">
-      <button type="button" id="join-cancel" class="icon-btn sheet-close" title="Close" aria-label="Close">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
-      </button>
-      <h2>Join a room</h2>
+      <header class="sheet-head">
+        <h2>Join a room</h2>
+        <button type="button" id="join-cancel" class="icon-btn" title="Close" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
       <p class="sheet-note">The invite carries the server, the room, the key and the hash of its certificate. Paste the whole thing.</p>
-      <div class="field-group">
-        <div class="field">
-          <label for="invite">Invite code</label>
-          <textarea id="invite" rows="3" spellcheck="false" placeholder="grokbox1-…"></textarea>
-        </div>
-        <div class="field">
-          <label for="join-name">Your name in the room</label>
-          <input id="join-name" type="text" spellcheck="false" placeholder="justin" />
-        </div>
-      </div>
+
+      <label class="sheet-label" for="invite">Invite code</label>
+      <textarea id="invite" class="sheet-field mono" rows="3" spellcheck="false" placeholder="grokbox1-…"></textarea>
+
+      <label class="sheet-label" for="join-name">Your name in the room</label>
+      <input id="join-name" class="sheet-field" type="text" spellcheck="false" placeholder="justin" />
+
       <p id="join-error" class="sheet-error" hidden></p>
       <div class="sheet-actions">
         <button type="button" id="join-close" class="ghost-btn">Cancel</button>

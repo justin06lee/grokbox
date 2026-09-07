@@ -57,6 +57,7 @@ func main() {
 	rooms := NewManager()
 	notes := notifications.New()
 	dk := dock.New()
+	api := &API{m: rooms}
 
 	app := application.New(application.Options{
 		// The name macOS shows: in the menu bar, the dock, and the
@@ -66,7 +67,7 @@ func main() {
 		Description: "A chat room behind a key.",
 		Icon:        appIcon,
 		Services: []application.Service{
-			application.NewService(&API{m: rooms}),
+			application.NewService(api),
 			application.NewService(notes),
 			application.NewService(dk),
 		},
@@ -106,6 +107,9 @@ func main() {
 	})
 
 	rooms.attach(app, notes, dk)
+	// The clipboard and the file dialog hang off the application, which does
+	// not exist until now — the service was registered before it did.
+	api.app = app
 
 	// Closing the window hides it. Quitting is the tray menu or ⌘Q, and both
 	// are deliberate acts — clicking the red button to stop being told when
@@ -154,6 +158,10 @@ func main() {
 		if err := rooms.Load(); err != nil {
 			app.Logger.Error("cannot read saved rooms", "error", err)
 		}
+		// Your picture, if this machine is signed in to GitHub anywhere. It
+		// runs behind the window rather than in front of it: a missing avatar
+		// is a coloured disc, not a reason to wait.
+		rooms.findPhoto()
 	})
 
 	if err := app.Run(); err != nil {

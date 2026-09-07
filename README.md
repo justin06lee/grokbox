@@ -379,10 +379,42 @@ cursor in the room search; right-clicking a room in the sidebar leaves it.
 
 **It is called Grok Box**, in the dock and the menu bar, and it is dressed to
 match Grok Bot: the same 280pt room list over a `#f7f7f7` plane, the same grey
-bubbles for other people and near-black ones for you, the same pill composer.
-The colours are Grok Bot 0.43.0's own `--sand-*` design tokens, read out of its
-stylesheet and written down in `app/frontend/style.css` next to the token each
-one came from. The command, the binary and the bundle stay `grokbox`.
+bubbles for other people and near-black ones for you, the same pill composer,
+the same settings pane on the right and the same menu on a right-click. The
+colours are Grok Bot's own `--sand-*` design tokens, read out of its stylesheet
+and written down in `app/frontend/style.css` next to the token each one came
+from. The command, the binary and the bundle stay `grokbox`.
+
+**Every room has a face.** Grok Bot dresses each of its bots in one of eight
+shapes and one of eleven colours; `app/frontend/avatar.js` draws the same eight
+— blob, pebble, squircle, tablet, wedge, hex, cloud, teardrop — in the same
+palette. A room you have not dressed gets a shape and a colour hashed from its
+name, so it looks the same on every machine that joins it. Click the picture in
+the settings pane, or right-click the room and pick **Change picture**, to
+choose: Bot for the grid, Shuffle for a random pair, Upload for a file of your
+own, Reset to go back to the derived one.
+
+**Your own picture comes from GitHub.** Grok Bot signs in through GitHub and
+keeps the avatar's URL sealed in an encrypted store, so instead of prising that
+open the app asks the machine who it is — `gh api user`, then `git config
+github.user` — and fetches the same public avatar from `github.com/<you>.png`.
+It lands in `media/` beside the config and shows in the sidebar footer. Click
+that row to change it.
+
+**The settings pane** (⌘I, the button at the top right, or **Room settings** in
+the right-click menu) holds the whole of a room in one column: its picture, a
+nickname for when two people both called theirs `lounge`, the name you took in
+it, the invite code with a Copy button and the certificate it is pinned to, a
+notifications switch for that room alone, who is in it, and the way out.
+
+**Right-clicking a room** offers Mark as Unread, Change picture, Room settings,
+Copy invite code, Copy room ID, Hide from sidebar, and Leave room. A hidden
+room stays joined and stays connected — hiding is about the list, not the
+membership — and the sidebar grows a **Hidden rooms** row to get them back.
+
+None of this touches `client.json`. Room keys and session tokens are shared
+with the CLI and a colour picker has no business writing to that file, so the
+window keeps its own `app.json` next to it.
 
 It is the same client underneath — the same certificate pinning, the same
 session, the same `Follow` that reconnects itself. Not a second implementation
@@ -497,6 +529,8 @@ time does not get through either.
 | Path | |
 |---|---|
 | `~/.config/grokbox/client.json` | Rooms this machine has joined, their keys, and read cursors. Mode `0600`. |
+| `~/.config/grokbox/app.json` | The desktop app's own state: each room's avatar, nickname and notification switch, and your GitHub login. Nothing secret. |
+| `~/.config/grokbox/media/` | Pictures the app shows — your fetched avatar, and anything you uploaded. |
 | `~/.config/grokbox/server/rooms.json` | Room keys, so invites survive a restart. |
 | `~/.config/grokbox/server/cert.pem`, `key.pem` | The self-signed certificate the invites pin. Mode `0600`. |
 | `~/.config/grokbox/server/server.json` | The advertised address, so `grokbox rooms` can rebuild invites. |
