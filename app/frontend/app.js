@@ -50,6 +50,11 @@ const el = {
   paneFp: $("pane-fp"),
   paneNotify: $("pane-notify"),
   paneLeave: $("pane-leave"),
+  ask: $("ask"),
+  askTitle: $("ask-title"),
+  askBody: $("ask-body"),
+  askYes: $("ask-yes"),
+  askNo: $("ask-no"),
 };
 
 let rooms = [];
@@ -74,8 +79,7 @@ async function boot() {
   profile = (await call("Profile")) || profile;
   rooms = (await call("Rooms")) || [];
   renderRooms();
-  const visible = rooms.filter((r) => !r.hidden);
-  const first = visible.find((r) => r.mentioned) || visible.find((r) => r.unread > 0) || visible[0];
+  const first = pick();
   if (first) {
     await openRoom(first.id);
   } else {
@@ -96,11 +100,36 @@ Events.On("grokbox:rooms", (e) => {
     renderHeader(current);
     renderPane();
   } else if (activeId) {
+    // The room being read is gone — you left it. Land on the next one; the
+    // empty state is for having no rooms at all, and showing it with rooms
+    // still in the sidebar reads as though they went too.
     activeId = null;
     current = null;
-    showEmpty(true);
+    showNext();
   }
 });
+
+// pick is the room to land on with nothing else to go by: one that named you,
+// else one with anything unread, else the top of the list.
+function pick() {
+  const visible = rooms.filter((r) => !r.hidden);
+  return visible.find((r) => r.mentioned) || visible.find((r) => r.unread > 0) || visible[0];
+}
+
+// showNext opens that room, or shows the empty state when there is none left.
+// Opening a room publishes the room list again, which lands back here — the
+// flag is what stops that from starting a second open.
+let switching = false;
+function showNext() {
+  if (switching) return;
+  const room = pick();
+  if (!room) {
+    showEmpty(true);
+    return;
+  }
+  switching = true;
+  openRoom(room.id).finally(() => (switching = false));
+}
 
 Events.On("grokbox:message", (e) => {
   const { room, message } = e.data || {};
@@ -307,12 +336,16 @@ el.paneNotify.addEventListener("change", () => {
 
 $("pane-copy").onclick = () => copy(el.paneInvite.value, "Invite code copied");
 
-el.paneLeave.onclick = () => {
+el.paneLeave.onclick = async () => {
   if (!current) return;
-  if (!confirm(`Leave ${current.room}?\n\nYou will need the invite code to come back.`)) return;
-  call("Leave", current.id)
-    .then(() => togglePane(false))
-    .catch(oops);
+  const { id, room } = current;
+  if (!(await confirmLeave(room))) return;
+  try {
+    await call("Leave", id);
+    togglePane(false);
+  } catch (err) {
+    oops(err);
+  }
 };
 
 $("pane-avatar-btn").onclick = (e) => {
@@ -372,10 +405,8 @@ function roomMenu(r, x, y) {
       icon: ICON.leave,
       label: "Leave room",
       danger: true,
-      run: () => {
-        if (confirm(`Leave ${r.room}?\n\nYou will need the invite code to come back.`)) {
-          call("Leave", r.id).catch(oops);
-        }
+      run: async () => {
+        if (await confirmLeave(r.room)) call("Leave", r.id).catch(oops);
       },
     },
   ]);
@@ -752,12 +783,68 @@ $("join-form").addEventListener("submit", async (e) => {
   }
 });
 
+// ------------------------------------------------------------ asking first
+
+// ask puts a question on screen and resolves to what was clicked.
+//
+// It exists because window.confirm does not work here: WKWebView hands the
+// call to the host, and Wails has no panel to show for it, so confirm()
+// returns false without ever asking. Anything gated on one silently does
+// nothing — which is what "Leave room" did. alert() and prompt() go the same
+// way; when something needs to say or ask, it comes through here or a toast.
+let askClose = null;
+
+function ask({ title, body, confirm: label = "OK", danger = false }) {
+  askClose?.(false); // a second question replaces the first rather than stacking
+  el.askTitle.textContent = title;
+  el.askBody.textContent = body;
+  el.askYes.textContent = label;
+  el.askYes.classList.toggle("danger", danger);
+  el.ask.hidden = false;
+  el.askYes.focus();
+
+  return new Promise((resolve) => {
+    askClose = (answer) => {
+      el.ask.hidden = true;
+      el.askYes.onclick = el.askNo.onclick = null;
+      el.ask.onmousedown = null;
+      askClose = null;
+      resolve(answer);
+    };
+    el.askYes.onclick = () => askClose(true);
+    el.askNo.onclick = () => askClose(false);
+    // Clicking the dimmed backdrop is a cancel, the way it is on the join sheet.
+    el.ask.onmousedown = (e) => {
+      if (e.target === el.ask) askClose(false);
+    };
+  });
+}
+
+// confirmLeave is the one question the app asks, from the two places that ask
+// it: the settings pane and the right-click menu.
+const confirmLeave = (room) =>
+  ask({
+    title: `Leave ${room}?`,
+    body: "You will need the invite code to come back.",
+    confirm: "Leave",
+    danger: true,
+  });
+
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    if (askClose) return askClose(false);
     if (!el.pop.hidden) return closePop();
     if (!el.menu.hidden) return closeMenu();
     if (!el.modal.hidden) return closeJoin();
     if (paneOpen) return togglePane(false);
+  }
+  if (askClose) {
+    // While a question is up it is the only thing the keyboard talks to.
+    if (e.key === "Enter") {
+      e.preventDefault();
+      askClose(true);
+    }
+    return;
   }
   // ⌘N is what every chat app uses for "new conversation", and there is no
   // menu bar item competing for it here.

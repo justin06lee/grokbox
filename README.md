@@ -375,7 +375,7 @@ Builds it, installs it to `/Applications`, and opens it. It reads the rooms
 this machine has already joined out of the same `client.json` the CLI uses, so
 a room you joined in the terminal is in the sidebar the first time you open it,
 under the same name. ⌘N takes an invite code and adds a new one; ⌘F puts the
-cursor in the room search; right-clicking a room in the sidebar leaves it.
+cursor in the room search; right-clicking a room in the sidebar opens its menu.
 
 **It is called Grok Box**, in the dock and the menu bar, and it is dressed to
 match Grok Bot: the same 280pt room list over a `#f7f7f7` plane, the same grey
@@ -415,6 +415,16 @@ notifications switch for that room alone, who is in it, and the way out.
 Copy invite code, Copy room ID, Hide from sidebar, and Leave room. A hidden
 room stays joined and stays connected — hiding is about the list, not the
 membership — and the sidebar grows a **Hidden rooms** row to get them back.
+
+**Leaving asks first**, from the menu or from the pane, in the app's own sheet
+rather than the browser's: the webview has no `window.confirm` — WKWebView
+hands the call to the host and Wails has no panel to put up, so it answers
+"no" without ever asking. Enter leaves, Escape or the backdrop cancels. The
+room goes from this machine first and the server is told afterwards, in the
+background, so a server that has gone away cannot hold the button down — the
+goodbye is only what puts a leave line in the room straight away instead of at
+the idle timeout. Leaving the room you were reading lands you on the next one,
+not on the empty state.
 
 None of this touches `client.json`. Room keys and session tokens are shared
 with the CLI and a colour picker has no business writing to that file, so the
