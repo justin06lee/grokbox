@@ -39,15 +39,16 @@ make
 ```
 
 For people who would rather not install Go, `make dist` cross-compiles binaries
-for macOS, Linux and Windows into `./dist`; `gh release create v0.2.0 dist/*`
-puts them where others can download them.
+for macOS, Linux and Windows into `./dist`, and `make app-dist` does the same
+for the desktop app; `gh release create v0.4.0 dist/*` puts them where others
+can download them.
 
 ## Host a room
 
 ```console
 $ grokbox serve
 
-grokbox v0.2.0 — listening on :7777
+grokbox v0.4.0 — listening on :7777
 reachable at https://203.0.113.9:7777   (public — anyone with the invite can reach it)
 
   room    lounge
