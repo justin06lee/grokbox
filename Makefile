@@ -296,4 +296,4 @@ ifeq ($(shell uname -s),Darwin)
 	@cd $(APP_DIR)/bin && zip -qry "../../dist/$(BINARY)-demo-app-macos.zip" "Grok Box Demo.app"
 	@echo "  dist/$(BINARY)-demo-app-macos.zip"
 endif
-	@echo "  dist/Grok Box Demo.html"
+	@echo "  dist/grokbox-demo.html"

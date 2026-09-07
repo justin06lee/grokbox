@@ -45,8 +45,8 @@ The macOS desktop app is `grokbox-app-macos.zip`; it unzips to **Grok Box.app**
 binary inside the bundle and the bundle id all stay `grokbox`; only what the
 Finder puts under the icon is the name you read.
 
-To see what the app is before installing anything, download **Grok Box
-Demo.html** from the same release and open it. It is one self-contained file
+To see what the app is before installing anything, download **grokbox-demo.html**
+from the same release and open it. It is one self-contained file
 that runs the real interface in a browser — no unzip, nothing for Gatekeeper
 to quarantine, no account and no server.
 
@@ -374,10 +374,10 @@ launchctl load ~/Library/LaunchAgents/sh.grokbox.notify.plist
 
 ## Peer room demo
 
-The quickest way to see it is to download **Grok Box Demo.html** from the
+The quickest way to see it is to download **grokbox-demo.html** from the
 [latest release](https://github.com/justin06lee/grokbox/releases/latest) and
 double-click it. To build it yourself, `make demo` creates that same
-**dist/Grok Box Demo.html**, a single offline file you can open in a browser. It uses the actual desktop app’s markup, stylesheet,
+**dist/grokbox-demo.html**, a single offline file you can open in a browser. It uses the actual desktop app’s markup, stylesheet,
 avatars, message renderer, composer, and settings. No presentation controls
 or demo labels appear inside the window.
 
