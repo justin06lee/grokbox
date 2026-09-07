@@ -3,27 +3,47 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>grokbox</title>
+  <title>Grok Box</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <div id="app">
     <aside id="sidebar">
       <header class="side-head">
-        <div class="brand">grokbox</div>
-        <button id="add-room" class="icon-btn" title="Join a room" aria-label="Join a room">+</button>
+        <button id="add-room" class="icon-btn" title="Join a room" aria-label="Join a room">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
       </header>
+
+      <div class="search">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="search" type="text" placeholder="Search" spellcheck="false" autocomplete="off" aria-label="Search rooms" />
+      </div>
+
       <nav id="rooms" class="rooms"></nav>
-      <footer class="side-foot"><span id="version"></span></footer>
+
+      <footer class="side-foot">
+        <button id="foot-join" class="foot-row" type="button">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 11h18M12 7V4M8.5 4h7"/></svg>
+          <span>Join a room</span>
+        </button>
+        <div class="foot-row static" id="foot-me">
+          <span class="avatar small" id="me-avatar"></span>
+          <span class="foot-who"><b id="me-name">grokbox</b><span id="version"></span></span>
+        </div>
+      </footer>
     </aside>
 
     <main id="main">
       <header id="room-head" class="room-head" hidden>
-        <div class="room-head-text">
-          <h1 id="room-name"></h1>
-          <p id="room-sub"></p>
+        <span class="avatar small" id="head-avatar"></span>
+        <h1 id="room-name"></h1>
+        <span id="room-sub" class="head-note"></span>
+        <div class="head-actions">
+          <button id="members-btn" class="icon-btn" title="Who is in the room" aria-label="Who is in the room">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/><circle cx="10" cy="8" r="3.2"/><path d="M20 19v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.4 5.2a3.2 3.2 0 0 1 0 5.6"/></svg>
+          </button>
         </div>
-        <button id="members-btn" class="ghost-btn" title="Who is in the room">Members</button>
       </header>
 
       <section id="stream" class="stream"></section>
@@ -38,9 +58,12 @@
       </div>
 
       <form id="composer" class="composer" hidden>
+        <button id="composer-add" type="button" class="round-btn" title="Join a room" aria-label="Join a room">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
         <textarea id="input" rows="1" placeholder="Write a message…" autocomplete="off" spellcheck="true"></textarea>
-        <button id="send" type="submit" class="send-btn" title="Send" aria-label="Send">
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3.2 20.5 21 12 3.2 3.5l.1 6.6L15 12 3.3 13.9z" fill="currentColor"/></svg>
+        <button id="send" type="submit" class="round-btn send-btn" title="Send" aria-label="Send" disabled>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M6 12l6-6 6 6"/></svg>
         </button>
       </form>
     </main>
@@ -53,15 +76,24 @@
 
   <div id="modal" class="modal" hidden>
     <form class="sheet" id="join-form">
+      <button type="button" id="join-cancel" class="icon-btn sheet-close" title="Close" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
       <h2>Join a room</h2>
       <p class="sheet-note">The invite carries the server, the room, the key and the hash of its certificate. Paste the whole thing.</p>
-      <label for="invite">Invite code</label>
-      <textarea id="invite" rows="3" spellcheck="false" placeholder="grokbox1-…"></textarea>
-      <label for="join-name">Your name in the room</label>
-      <input id="join-name" type="text" spellcheck="false" placeholder="justin" />
+      <div class="field-group">
+        <div class="field">
+          <label for="invite">Invite code</label>
+          <textarea id="invite" rows="3" spellcheck="false" placeholder="grokbox1-…"></textarea>
+        </div>
+        <div class="field">
+          <label for="join-name">Your name in the room</label>
+          <input id="join-name" type="text" spellcheck="false" placeholder="justin" />
+        </div>
+      </div>
       <p id="join-error" class="sheet-error" hidden></p>
       <div class="sheet-actions">
-        <button type="button" id="join-cancel" class="ghost-btn">Cancel</button>
+        <button type="button" id="join-close" class="ghost-btn">Cancel</button>
         <button type="submit" id="join-go" class="primary-btn">Join</button>
       </div>
     </form>

@@ -364,7 +364,7 @@ cannot do is hold every room you are in open at once while you work on
 something else. That is what the app is for.
 
 <div align="center">
-<img src="assets/app.png" alt="the grokbox desktop app" width="760" />
+<img src="assets/app.png" alt="the Grok Box desktop app" width="760" />
 </div>
 
 ```bash
@@ -374,8 +374,15 @@ make app
 Builds it, installs it to `/Applications`, and opens it. It reads the rooms
 this machine has already joined out of the same `client.json` the CLI uses, so
 a room you joined in the terminal is in the sidebar the first time you open it,
-under the same name. ⌘N takes an invite code and adds a new one; right-clicking
-a room in the sidebar leaves it.
+under the same name. ⌘N takes an invite code and adds a new one; ⌘F puts the
+cursor in the room search; right-clicking a room in the sidebar leaves it.
+
+**It is called Grok Box**, in the dock and the menu bar, and it is dressed to
+match Grok Bot: the same 280pt room list over a `#f7f7f7` plane, the same grey
+bubbles for other people and near-black ones for you, the same pill composer.
+The colours are Grok Bot 0.43.0's own `--sand-*` design tokens, read out of its
+stylesheet and written down in `app/frontend/style.css` next to the token each
+one came from. The command, the binary and the bundle stay `grokbox`.
 
 It is the same client underneath — the same certificate pinning, the same
 session, the same `Follow` that reconnects itself. Not a second implementation

@@ -154,6 +154,9 @@ clean: app-clean
 # of the protocol and one of the certificate pinning.
 
 APP_NAME   := grokbox
+# What a person reads: the menu bar, the dock, the Finder. The binary, the
+# bundle directory and the CLI stay grokbox so `open -a` and pkill keep working.
+APP_LABEL  := Grok Box
 APP_ID     := com.grokbox.app
 APP_DIR    := app
 APP_BUNDLE := $(APP_DIR)/bin/$(APP_NAME).app
@@ -163,7 +166,7 @@ export MACOSX_DEPLOYMENT_TARGET := 13.0
 
 app: app-quit app-build app-bundle app-install
 	@echo
-	@echo "  $(APP_NAME) $(VERSION) — the desktop app"
+	@echo "  $(APP_LABEL) $(VERSION) — the desktop app"
 ifeq ($(shell uname -s),Darwin)
 	@open -a /Applications/$(APP_NAME).app
 	@echo "  opened from /Applications. It stays in the menu bar when you close the window."
@@ -196,8 +199,8 @@ ifeq ($(shell uname -s),Darwin)
 		'<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
 		'<plist version="1.0"><dict>' \
 		'  <key>CFBundlePackageType</key><string>APPL</string>' \
-		'  <key>CFBundleName</key><string>$(APP_NAME)</string>' \
-		'  <key>CFBundleDisplayName</key><string>$(APP_NAME)</string>' \
+		'  <key>CFBundleName</key><string>$(APP_LABEL)</string>' \
+		'  <key>CFBundleDisplayName</key><string>$(APP_LABEL)</string>' \
 		'  <key>CFBundleExecutable</key><string>$(APP_NAME)</string>' \
 		'  <key>CFBundleIdentifier</key><string>$(APP_ID)</string>' \
 		'  <key>CFBundleIconFile</key><string>icon</string>' \
@@ -227,7 +230,7 @@ else
 	@printf '%s\n' \
 		'[Desktop Entry]' \
 		'Type=Application' \
-		'Name=grokbox' \
+		'Name=$(APP_LABEL)' \
 		'Comment=A chat room behind a key' \
 		'Exec=$(BINDIR)/$(APP_NAME)-app' \
 		'Icon=$(APP_NAME)' \

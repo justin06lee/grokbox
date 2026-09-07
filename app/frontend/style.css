@@ -1,54 +1,110 @@
-/* grokbox — a chat window that looks like a chat window.
-   Light and dark both come from the banner's palette: near-black, slate,
-   gold, and the three speech-bubble colours. */
+/* Grok Box — the same shell Grok Bot wears.
+   Every colour here is a token read out of Grok Bot 0.43.0's own stylesheet
+   (app.asar → dist/renderer/assets/index-*.css, the `--sand-*` block), and
+   every measurement was taken off a screenshot of its window at 2x. The
+   comments name the token each value came from so a later change can be
+   checked against the same source rather than guessed at. */
 
 :root {
-  --titlebar: 44px;
-  --sidebar-w: 264px;
+  /* --sand-bg-base / --sand-bg-subtle: the two planes the window is made of. */
+  --bg: #fcfcfc;
+  --bg-subtle: #f7f7f7;
+  --bg-elevated: #fcfcfc;
+  --scrim: #14141480;
 
-  --bg: #ffffff;
-  --bg-side: #f5f5f7;
-  --bg-raised: #ffffff;
-  --line: #e3e3e8;
-  --text: #1b1b1f;
-  --text-dim: #6b6b76;
-  --text-faint: #9a9aa4;
-  --bubble: #f0f0f3;
-  --bubble-text: #1b1b1f;
-  --accent: #4b62d8;
-  --accent-text: #ffffff;
-  --accent-soft: #eceffc;
-  --mention: #e8785c;
-  --mention-soft: #fdeeea;
-  --good: #34a06a;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .06), 0 8px 24px rgba(0, 0, 0, .08);
-  --radius: 16px;
+  /* --sand-text-* */
+  --text: #141414;
+  --text-secondary: #14141499;
+  --text-tertiary: #1414149c;
+  --text-on-primary: #fcfcfc;
+
+  /* --sand-fill-* */
+  --fill-ghost-hover: #77777717;
+  --fill-ghost-selected: #7777772b;
+  --fill-secondary: #77777717;
+  --fill-secondary-solid: #f3f3f3;
+  --fill-secondary-solid-hover: #eeeeee;
+  --fill-primary: #070707;
+  --fill-primary-hover: #2f2f2f;
+  --fill-bubble-agent: #eeeeee;
+  --fill-bubble-user: #070707;
+  /* The composer pill sits on the base plane in light and lifts off it in
+     dark, which is why it gets a token of its own rather than reusing
+     --bg-elevated (the modal sheet stays darker than this). */
+  --fill-composer: #fcfcfc;
+  --fill-accent-subtle: #1084fe17;
+  --fill-danger-subtle: #ff263c17;
+
+  /* --sand-border-* */
+  --border: #14141426;
+  --border-weak: #1414141a;
+  --border-accent: #459ffe;
+  --border-accent-subtle: #1084fe2b;
+  --border-focus: #0c64c1;
+
+  --text-accent: #0c64c1;
+  --text-danger: #c21d2e;
+  --fill-success: #00c972;
+
+  /* --sand-shadow-* */
+  --shadow-control: 0 1px 2px #0000001f;
+  --shadow-popover: 0 2px 8px #0000001a, 0 8px 24px #0000001a;
+  --shadow-modal: 0 8px 24px #0000001a, 0 24px 64px #0000001a;
+
+  /* Measured off the window, in points. */
+  --titlebar: 48px;
+  --sidebar-w: 280px;
+  --stream-pad: 26px;
+  --bubble-radius: 18px;
 
   color-scheme: light dark;
 }
 
+/* Grok Bot's dark theme is generated at runtime rather than shipped in the
+   stylesheet, so these were sampled from its window with Appearance → Dark. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #16161c;
-    --bg-side: #101015;
-    --bg-raised: #1e1e26;
-    --line: #2a2a34;
-    --text: #ededf2;
-    --text-dim: #9b9baa;
-    --text-faint: #6d6d7c;
-    --bubble: #262b36;
-    --bubble-text: #ededf2;
-    --accent: #5a72e8;
-    --accent-text: #ffffff;
-    --accent-soft: #22273a;
-    --mention: #e8785c;
-    --mention-soft: #2e2220;
-    --good: #7fd1c0;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 32px rgba(0, 0, 0, .38);
+    --bg: #070707;
+    --bg-subtle: #111111;
+    --bg-elevated: #1c1c1c;
+    --scrim: #000000b3;
+
+    --text: #fcfcfc;
+    --text-secondary: #fcfcfc99;
+    --text-tertiary: #fcfcfc80;
+    --text-on-primary: #141414;
+
+    --fill-ghost-hover: #ffffff14;
+    --fill-ghost-selected: #313131;
+    --fill-secondary: #232323;
+    --fill-secondary-solid: #2f2f2f;
+    --fill-secondary-solid-hover: #3a3a3a;
+    --fill-primary: #fcfcfc;
+    --fill-primary-hover: #e4e4e4;
+    --fill-bubble-agent: #262626;
+    --fill-bubble-user: #5a5a5a;
+    --fill-composer: #2f2f2f;
+    --fill-accent-subtle: #1084fe2b;
+    --fill-danger-subtle: #ff263c2b;
+
+    --border: #ffffff1f;
+    --border-weak: #ffffff14;
+
+    --text-accent: #6db4fe;
+    --text-danger: #ff5667;
+
+    --shadow-control: 0 1px 2px #00000059;
+    --shadow-popover: 0 2px 8px #00000073, 0 8px 24px #00000073;
+    --shadow-modal: 0 8px 24px #0000008f, 0 24px 64px #0000008f;
   }
 }
 
 * { box-sizing: border-box; }
+
+/* .composer, .room-head and .members all set `display`, and an author rule
+   beats the user agent's [hidden] { display: none } — without this the
+   composer and the header stay on screen in a window with no rooms in it. */
+[hidden] { display: none !important; }
 
 html, body {
   margin: 0;
@@ -56,7 +112,9 @@ html, body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  /* --cursor-font-family-sans, minus the VS Code variables that only exist
+     inside an editor window. */
+  font: 400 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   user-select: none;
   -webkit-user-select: none;
@@ -66,7 +124,7 @@ button { font: inherit; color: inherit; }
 
 #app {
   display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr auto;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) auto;
   /* An auto row grows to fit its content, which would push the composer off
      the bottom of the window; minmax(0, 1fr) pins it to the viewport and lets
      the stream scroll inside it instead. */
@@ -82,120 +140,182 @@ button { font: inherit; color: inherit; }
 #sidebar {
   display: flex;
   flex-direction: column;
-  background: var(--bg-side);
-  border-right: 1px solid var(--line);
+  background: var(--bg-subtle);
   min-width: 0;
 }
 
+/* The traffic lights live in this strip, so it is the drag handle and
+   nothing lands left of them. */
 .side-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: calc(var(--titlebar) + 4px) 14px 10px 16px;
+  justify-content: flex-end;
+  height: var(--titlebar);
+  padding: 0 12px;
+  flex: 0 0 auto;
   --wails-draggable: drag;
-}
-
-.brand {
-  font-weight: 650;
-  letter-spacing: -.01em;
-  font-size: 15px;
 }
 
 .icon-btn {
   --wails-draggable: no-drag;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 50%;
   background: transparent;
-  color: var(--text-dim);
-  font-size: 19px;
-  line-height: 1;
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
   cursor: pointer;
   transition: background .12s ease, color .12s ease;
 }
-.icon-btn:hover { background: var(--line); color: var(--text); }
+.icon-btn:hover { background: var(--fill-ghost-hover); color: var(--text); }
+.icon-btn.on { background: var(--fill-ghost-selected); color: var(--text); }
+
+/* The search field: 32pt tall, 8pt in from both sides. */
+.search {
+  --wails-draggable: no-drag;
+  position: relative;
+  margin: 0 8px 8px;
+  flex: 0 0 auto;
+}
+.search svg {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+.search input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px 0 30px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--fill-secondary);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.search input::placeholder { color: var(--text-secondary); }
+.search input:focus { box-shadow: inset 0 0 0 1px var(--border-focus); }
 
 .rooms {
   flex: 1;
   overflow-y: auto;
-  padding: 2px 8px 8px;
+  padding: 0 12px 8px;
 }
 
+/* 256pt wide inside a 280pt sidebar, avatar 32pt, two lines of text. */
 .room {
   display: grid;
-  grid-template-columns: 36px 1fr auto;
-  gap: 10px;
-  align-items: center;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: 10px;
   width: 100%;
-  padding: 8px 8px;
+  padding: 8px 10px;
   border: 0;
   border-radius: 10px;
   background: transparent;
   text-align: left;
   cursor: pointer;
-  transition: background .12s ease;
+  transition: background .1s ease;
 }
-.room:hover { background: var(--line); }
-.room.active { background: var(--accent-soft); }
+.room:hover { background: var(--fill-ghost-hover); }
+.room.active { background: var(--fill-ghost-selected); }
 
 .avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 11px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
-  font-weight: 650;
-  font-size: 14px;
+  font-weight: 600;
+  font-size: 13px;
   color: #14141a;
-  position: relative;
+  flex: 0 0 auto;
 }
+.avatar.small { width: 18px; height: 18px; font-size: 9px; }
+.avatar.tiny { width: 16px; height: 16px; font-size: 8px; }
 
-.avatar.small { width: 26px; height: 26px; border-radius: 8px; font-size: 11px; }
+.room-text { min-width: 0; display: block; }
 
-.room-text { min-width: 0; }
+.room-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
 .room-name {
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.room-when {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
 .room-last {
-  color: var(--text-dim);
-  font-size: 12.5px;
+  flex: 1;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.room.offline .room-name { color: var(--text-dim); }
+.room.offline .room-name { color: var(--text-secondary); }
 
 .pill {
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 10px;
-  background: var(--accent);
-  color: var(--accent-text);
-  font-size: 11.5px;
-  font-weight: 650;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--fill-primary);
+  color: var(--text-on-primary);
+  font-size: 11px;
+  font-weight: 600;
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
 }
-.pill.mention { background: var(--mention); }
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-faint);
-}
-.dot.on { background: var(--good); }
+.pill.mention { background: var(--border-accent); color: #fcfcfc; }
 
 .side-foot {
-  padding: 8px 16px 12px;
-  color: var(--text-faint);
-  font-size: 11.5px;
+  flex: 0 0 auto;
+  padding: 6px 12px 12px;
 }
+
+/* The two rows Grok Bot keeps down here: an action, then who you are. */
+.foot-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background .1s ease;
+}
+.foot-row:hover { background: var(--fill-ghost-hover); }
+.foot-row.static { cursor: default; }
+.foot-row.static:hover { background: transparent; }
+.foot-row svg { color: var(--text-secondary); flex: 0 0 auto; }
+.foot-who { min-width: 0; }
+.foot-who b { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.foot-who span { display: block; font-size: 11px; color: var(--text-secondary); }
 
 /* ---------------------------------------------------------------- main */
 
@@ -208,43 +328,58 @@ button { font: inherit; color: inherit; }
 
 .room-head {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  padding: calc(var(--titlebar) - 8px) 18px 12px;
-  border-bottom: 1px solid var(--line);
+  align-items: center;
+  gap: 8px;
+  height: var(--titlebar);
+  flex: 0 0 auto;
+  padding: 0 16px 0 var(--stream-pad);
   --wails-draggable: drag;
 }
-.room-head h1 { margin: 0; font-size: 15.5px; font-weight: 650; letter-spacing: -.01em; }
-.room-head p { margin: 2px 0 0; font-size: 12.5px; color: var(--text-dim); }
-.room-head p .sep { opacity: .5; margin: 0 6px; }
-.room-head p .warn { color: var(--mention); }
-
-.ghost-btn {
-  --wails-draggable: no-drag;
-  border: 1px solid var(--line);
-  background: transparent;
-  border-radius: 9px;
-  padding: 5px 11px;
-  font-size: 12.5px;
-  color: var(--text-dim);
-  cursor: pointer;
-  transition: background .12s ease, color .12s ease;
+.room-head h1 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.ghost-btn:hover { background: var(--line); color: var(--text); }
-.ghost-btn.on { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.head-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.head-note.warn { color: var(--text-danger); }
+.head-actions { margin-left: auto; display: flex; gap: 2px; --wails-draggable: no-drag; }
 
 .primary-btn {
   border: 0;
-  border-radius: 10px;
-  background: var(--accent);
-  color: var(--accent-text);
-  padding: 8px 16px;
-  font-size: 13.5px;
-  font-weight: 600;
+  border-radius: 999px;
+  background: var(--fill-primary);
+  color: var(--text-on-primary);
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background .1s ease;
 }
+.primary-btn:hover { background: var(--fill-primary-hover); }
 .primary-btn:disabled { opacity: .5; cursor: default; }
+
+.ghost-btn {
+  border: 0;
+  border-radius: 999px;
+  background: var(--fill-secondary-solid);
+  color: var(--text);
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .1s ease;
+}
+.ghost-btn:hover { background: var(--fill-secondary-solid-hover); }
 
 /* -------------------------------------------------------------- stream */
 
@@ -252,163 +387,172 @@ button { font: inherit; color: inherit; }
   flex: 1;
   min-height: 0; /* without this the stream grows past the window and takes the composer with it */
   overflow-y: auto;
-  padding: 16px 18px 8px;
+  /* Bubbles sit 26pt from the sidebar and 16pt from the window edge, which
+     is what lines a right-hand bubble up with the end of the composer. */
+  padding: 8px 16px 4px var(--stream-pad);
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
+/* Centred, no pill — Grok Bot writes the day and the clock as one grey line. */
 .day {
   align-self: center;
-  margin: 14px 0 10px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--bubble);
-  color: var(--text-dim);
-  font-size: 11.5px;
-  font-weight: 600;
+  margin: 22px 0 18px;
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .system {
   align-self: center;
-  margin: 4px 0;
-  color: var(--text-faint);
+  margin: 16px 0;
+  color: var(--text-secondary);
   font-size: 12px;
   text-align: center;
 }
 
-.row {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: 9px;
-  margin-top: 10px;
-}
-.row.same { margin-top: 1px; }
-.row.same .avatar { visibility: hidden; }
-.row.mine { grid-template-columns: minmax(0, 1fr); justify-items: end; }
-.row.mine .avatar { display: none; }
+/* 16pt between one person's block and the next, 4pt inside a block. */
+.row { margin-top: 16px; display: flex; flex-direction: column; align-items: flex-start; }
+.row.same { margin-top: 4px; }
+.row.mine { align-items: flex-end; }
 
 .who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px 2px;
   font-size: 12px;
-  color: var(--text-dim);
-  margin: 0 0 3px 2px;
-  font-weight: 600;
+  color: var(--text-secondary);
 }
-.who time { font-weight: 400; color: var(--text-faint); margin-left: 6px; }
+.who time { color: var(--text-tertiary); }
 
 .bubble {
-  max-width: min(620px, 78%);
-  padding: 7px 12px;
-  border-radius: var(--radius);
-  border-top-left-radius: 5px;
-  background: var(--bubble);
-  color: var(--bubble-text);
+  max-width: min(640px, 76%);
+  padding: 8px 14px;
+  border-radius: var(--bubble-radius);
+  background: var(--fill-bubble-agent);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 20px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   user-select: text;
   -webkit-user-select: text;
 }
-.row.same .bubble { border-top-left-radius: var(--radius); }
 .row.mine .bubble {
-  background: var(--accent);
-  color: var(--accent-text);
-  border-radius: var(--radius);
-  border-top-right-radius: 5px;
+  background: var(--fill-bubble-user);
+  color: #fcfcfc;
 }
-.row.mine.same .bubble { border-top-right-radius: var(--radius); }
 
+/* Being named is the one thing this app exists to show you, and Grok Bot has
+   no equivalent, so it borrows the accent tokens rather than inventing a
+   colour: a blue wash and a blue hairline, both from --sand-*-accent-*. */
 .bubble.mention {
-  background: var(--mention-soft);
-  box-shadow: inset 3px 0 0 var(--mention);
-  border-top-left-radius: 5px;
+  background: var(--fill-accent-subtle);
+  box-shadow: inset 0 0 0 1px var(--border-accent-subtle);
 }
 
-.bubble .at { font-weight: 650; }
+.bubble .at { font-weight: 600; }
 .row.mine .bubble .at { text-decoration: underline; text-underline-offset: 2px; }
 
 .action .bubble {
   background: transparent;
-  color: var(--text-dim);
+  color: var(--text-secondary);
   font-style: italic;
   padding-left: 2px;
 }
 
-.stamp {
-  font-size: 11px;
-  color: var(--text-faint);
-  margin: 2px 4px 0;
-}
-
 /* ------------------------------------------------------------ composer */
 
+/* A 44pt pill, 16pt in from the pane on both sides, with a round button at
+   each end — the shape Grok Bot puts under every conversation. */
 .composer {
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 10px 18px 16px;
-  border-top: 1px solid var(--line);
+  margin: 6px 16px 14px;
+  padding: 7px 8px 7px 9px;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--fill-composer);
+  box-shadow: var(--shadow-control);
+}
+
+.round-btn {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 50%;
+  background: var(--fill-secondary);
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background .1s ease, color .1s ease, opacity .1s ease;
+}
+.round-btn:hover { background: var(--fill-ghost-selected); color: var(--text); }
+
+.send-btn {
+  background: var(--fill-primary);
+  color: var(--text-on-primary);
+}
+.send-btn:hover { background: var(--fill-primary-hover); color: var(--text-on-primary); }
+/* Grok Bot's composer always ends in a solid round button. With nothing
+   typed there is nothing to send, so it drops back to the same inert grey as
+   the button at the other end rather than fading the black one out. */
+.send-btn:disabled {
+  cursor: default;
+  background: var(--fill-secondary);
+  color: var(--text-secondary);
 }
 
 .composer textarea {
   flex: 1;
   resize: none;
   max-height: 160px;
-  padding: 9px 13px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--bg-raised);
+  min-height: 28px;
+  padding: 4px 4px;
+  border: 0;
+  background: transparent;
   color: var(--text);
   font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  outline: none;
   user-select: text;
   -webkit-user-select: text;
-  outline: none;
-  transition: border-color .12s ease;
 }
-.composer textarea:focus { border-color: var(--accent); }
-
-.send-btn {
-  width: 34px;
-  height: 34px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-text);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  flex: 0 0 auto;
-  transition: opacity .12s ease;
-}
-.send-btn:disabled { opacity: .35; cursor: default; }
+.composer textarea::placeholder { color: var(--text-secondary); }
 
 /* ------------------------------------------------------------- members */
 
 .members {
-  width: 210px;
-  border-left: 1px solid var(--line);
-  background: var(--bg-side);
+  width: 230px;
+  background: var(--bg-subtle);
   overflow-y: auto;
   padding-bottom: 12px;
 }
 .members-head {
-  padding: calc(var(--titlebar) - 8px) 16px 12px;
-  font-size: 12px;
-  font-weight: 650;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: .05em;
+  height: var(--titlebar);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 500;
   --wails-draggable: drag;
 }
-.members ul { list-style: none; margin: 0; padding: 0 10px; }
+.members ul { list-style: none; margin: 0; padding: 0 12px; }
 .members li {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 5px 6px;
-  border-radius: 8px;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 10px;
   font-size: 13px;
 }
-.members li .you { color: var(--text-faint); font-size: 11.5px; }
+.members li .you { margin-left: auto; color: var(--text-secondary); font-size: 12px; }
 
 /* --------------------------------------------------------------- empty */
 
@@ -418,13 +562,13 @@ button { font: inherit; color: inherit; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   padding: 40px;
   text-align: center;
 }
 .empty.show { display: flex; }
-.empty h2 { margin: 10px 0 0; font-size: 17px; }
-.empty p { margin: 0 0 14px; color: var(--text-dim); max-width: 340px; }
+.empty h2 { margin: 14px 0 0; font-size: 15px; font-weight: 600; }
+.empty p { margin: 4px 0 16px; color: var(--text-secondary); font-size: 13px; max-width: 340px; }
 .empty-art { opacity: .9; }
 
 /* --------------------------------------------------------------- modal */
@@ -432,33 +576,51 @@ button { font: inherit; color: inherit; }
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(10, 10, 14, .42);
+  background: var(--scrim);
   display: grid;
   place-items: center;
-  backdrop-filter: blur(3px);
 }
 .modal[hidden] { display: none; }
 
 .sheet {
-  width: 400px;
+  width: 460px;
   max-width: calc(100vw - 48px);
-  background: var(--bg-raised);
-  border-radius: 18px;
-  box-shadow: var(--shadow);
-  padding: 20px;
+  background: var(--bg-elevated);
+  border-radius: 16px;
+  box-shadow: var(--shadow-modal);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.sheet h2 { margin: 0 0 4px; font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+.sheet-note { margin: 0 0 18px; color: var(--text-secondary); font-size: 13px; line-height: 1.45; }
+.sheet-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+/* Grok Bot groups every setting into one soft card with hairline dividers. */
+.field-group {
+  background: var(--fill-secondary);
+  border-radius: 12px;
+  padding: 4px 14px;
+}
+.field {
+  padding: 12px 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.sheet h2 { margin: 0; font-size: 16px; }
-.sheet-note { margin: 0 0 6px; color: var(--text-dim); font-size: 12.5px; }
-.sheet label { font-size: 12px; font-weight: 600; color: var(--text-dim); margin-top: 6px; }
-.sheet textarea, .sheet input {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--bg);
+.field + .field { border-top: 1px solid var(--border-weak); }
+.field label { font-size: 13px; font-weight: 500; }
+.field textarea, .field input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
   color: var(--text);
-  padding: 8px 11px;
+  padding: 8px 10px;
   font: inherit;
   font-size: 13px;
   resize: none;
@@ -466,10 +628,18 @@ button { font: inherit; color: inherit; }
   user-select: text;
   -webkit-user-select: text;
 }
-.sheet textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
-.sheet textarea:focus, .sheet input:focus { border-color: var(--accent); }
-.sheet-error { margin: 8px 0 0; color: var(--mention); font-size: 12.5px; }
-.sheet-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.field textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; line-height: 1.5; }
+.field textarea:focus, .field input:focus { border-color: var(--border-focus); }
+
+.sheet-error {
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--fill-danger-subtle);
+  color: var(--text-danger);
+  font-size: 13px;
+}
+.sheet-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 
 /* --------------------------------------------------------------- toast */
 
@@ -478,12 +648,12 @@ button { font: inherit; color: inherit; }
   left: 50%;
   bottom: 26px;
   transform: translateX(-50%);
-  background: var(--bg-raised);
+  background: var(--bg-elevated);
   color: var(--text);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-popover);
   border-radius: 12px;
-  padding: 9px 14px;
+  padding: 10px 14px;
   font-size: 13px;
   max-width: 70%;
 }
@@ -497,4 +667,4 @@ button { font: inherit; color: inherit; }
   border-radius: 8px;
   background-clip: padding-box;
 }
-:hover::-webkit-scrollbar-thumb { background: var(--line); background-clip: padding-box; }
+:hover::-webkit-scrollbar-thumb { background: var(--fill-ghost-selected); background-clip: padding-box; }
