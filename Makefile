@@ -9,7 +9,10 @@
 #   make app      build the desktop app, install it, and open it
 
 BINARY  := grokbox
-VERSION := $(shell git describe --tags --dirty --always 2>/dev/null || echo dev)
+# --match 'v*' so a feature tag never becomes the version: every completed
+# feature is tagged too, and without this a dev build reports the last feature
+# name instead of the last release.
+VERSION := $(shell git describe --tags --match 'v*' --dirty --always 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
 # /usr/local/bin when this machine lets us write there, ~/.local/bin otherwise.
