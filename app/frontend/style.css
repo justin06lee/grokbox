@@ -610,6 +610,17 @@ button { font: inherit; color: inherit; }
 }
 .sheet-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 
+/* The confirmation sheet is the same card with nothing in it but the question,
+   so it sits narrower and does not need the room a form does. */
+.sheet-ask { width: 400px; }
+.sheet-ask .sheet-note { margin-bottom: 0; }
+.sheet-ask .sheet-actions { margin-top: 22px; }
+.sheet-ask .primary-btn.danger {
+  background: var(--fill-danger-subtle);
+  color: var(--text-danger);
+}
+.sheet-ask .primary-btn.danger:hover { background: var(--fill-danger-subtle-hover); }
+
 /* --------------------------------------------------------------- toast */
 
 .toast {

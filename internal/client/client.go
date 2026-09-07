@@ -304,9 +304,12 @@ func (c *Client) Stream(ctx context.Context, fn func(proto.Message) error) error
 	}
 	req.Header.Set("Accept", "text/event-stream")
 
+	// friendly, the same as every other request: a dropped stream is the most
+	// likely thing to end up in front of a person, and a raw *url.Error names
+	// a Go method and a dial target rather than saying what is wrong.
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return err
+		return friendly(c.Server, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -342,7 +345,7 @@ func (c *Client) Stream(ctx context.Context, fn func(proto.Message) error) error
 		}
 	}
 	if err := sc.Err(); err != nil {
-		return err
+		return friendly(c.Server, err)
 	}
 	return io.EOF // the server closed the stream
 }

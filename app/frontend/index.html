@@ -160,6 +160,20 @@
     </form>
   </div>
 
+  <!-- Asking before something you cannot undo. The webview has no window.confirm
+       — WKWebView drops the call unless the host puts up the panel itself, and
+       Wails does not — so the app carries its own. -->
+  <div id="ask" class="modal" hidden>
+    <div class="sheet sheet-ask" role="alertdialog" aria-modal="true" aria-labelledby="ask-title" aria-describedby="ask-body">
+      <h2 id="ask-title"></h2>
+      <p class="sheet-note" id="ask-body"></p>
+      <div class="sheet-actions">
+        <button type="button" id="ask-no" class="ghost-btn">Cancel</button>
+        <button type="button" id="ask-yes" class="primary-btn"></button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast" hidden></div>
 
   <script type="module" src="/app.js"></script>

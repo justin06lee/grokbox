@@ -536,6 +536,13 @@ func (m *Manager) Join(invite, name string) (RoomView, error) {
 }
 
 // Leave ends the membership and forgets the room.
+//
+// The room goes from this machine first and the server is told afterwards, in
+// the background. Telling it is a courtesy — it puts a leave line in the room
+// straight away instead of waiting for the idle timeout — and a courtesy must
+// not be able to hold the button down: leaving is most wanted exactly when the
+// server is unreachable, and a server that accepts the connection but never
+// answers would otherwise freeze the window until the timeout ran out.
 func (m *Manager) Leave(id string) error {
 	r := m.find(id)
 	if r == nil {
@@ -544,9 +551,11 @@ func (m *Manager) Leave(id string) error {
 	if r.cancel != nil {
 		r.cancel()
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	_ = r.cl.Leave(ctx)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = r.cl.Leave(ctx)
+	}()
 
 	m.mu.Lock()
 	kept := m.rooms[:0]
