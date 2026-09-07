@@ -277,7 +277,7 @@ app-clean:
 # A portable demo, ready to double-click or share. No server or account needed.
 .PHONY: demo
 demo:
-	bun run app/demo-build.ts
+	VERSION=$(VERSION) bun run app/demo-build.ts
 
 # Build a separate native presentation without replacing the installed app.
 # APP_NAME changes too: sharing bin/grokbox with the real app would leave a

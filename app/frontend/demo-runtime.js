@@ -92,7 +92,7 @@ export const Call = {
   async ByName(name, ...args) {
     const method = name.split('.').pop();
     switch (method) {
-      case 'Version': return 'v0.5.1';
+      case 'Version': return DEMO_VERSION;
       case 'Profile': return clone(profile);
       case 'Rooms': return joined ? [clone(room)] : [];
       case 'Open':

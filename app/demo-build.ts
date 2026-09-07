@@ -3,6 +3,8 @@
 const base = new URL('./frontend/', import.meta.url);
 const result = await Bun.build({
   entrypoints: [new URL('app.js', base).pathname], target: 'browser', minify: true,
+  // Stamped like the Go build is, so the footer never drifts from the release.
+  define: { DEMO_VERSION: JSON.stringify(process.env.VERSION || 'dev') },
   plugins: [{ name: 'demo-transport', setup(build) {
     build.onResolve({ filter: /^\.\/runtime\.js$/ }, () => ({ path: new URL('demo-runtime.js', base).pathname }));
   } }],
