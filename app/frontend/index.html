@@ -86,7 +86,7 @@
       <div class="pane-body">
         <button id="pane-avatar-btn" class="pane-avatar" type="button" title="Change the picture">
           <span class="avatar huge" id="pane-avatar"></span>
-          <span class="pane-avatar-hint">Change</span>
+          <span class="pane-avatar-edit" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 5 5-13 13H3v-5Z M13 6l5 5"/></svg></span>
         </button>
 
         <label class="pane-label" for="pane-nick">Name</label>
@@ -123,16 +123,16 @@
   <div id="menu" class="menu" hidden role="menu"></div>
 
   <!-- The avatar picker, anchored under whatever it is dressing. -->
-  <div id="pop" class="pop" hidden>
+  <div id="pop" class="pop" role="dialog" aria-label="Change picture" hidden>
     <div class="pop-tabs">
       <button class="pop-tab on" data-tab="bot" type="button">Bot</button>
-      <button class="pop-tab" data-tab="shuffle" type="button">Shuffle</button>
+      <button class="pop-tab" data-tab="shuffle" type="button" title="Generate a random bot shape and colour">Generate</button>
       <button class="pop-tab" data-tab="upload" type="button">Upload</button>
       <button class="pop-tab reset" data-tab="reset" type="button">Reset</button>
     </div>
     <div class="pop-body">
-      <div id="pop-shapes" class="pop-shapes"></div>
-      <div id="pop-colors" class="pop-colors"></div>
+      <div id="pop-shapes" class="pop-shapes" role="group" aria-label="Bot shape"></div>
+      <div id="pop-colors" class="pop-colors" role="group" aria-label="Bot colour"></div>
     </div>
   </div>
 

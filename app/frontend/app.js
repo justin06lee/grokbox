@@ -60,6 +60,8 @@ let filter = "";
 let showHidden = false;
 let paneOpen = false;
 let popTarget = null; // what the avatar picker is dressing
+let popAnchor = null;
+let avatarSaving = false;
 let group = { from: null, at: 0, day: "" }; // what the last rendered row was
 
 // look is the three things that decide how something is drawn.
@@ -422,35 +424,52 @@ function closeMenu() {
 // ------------------------------------------------------- the avatar picker
 
 function openPop(anchor, target, x, y) {
+  if (popAnchor === anchor && !el.pop.hidden) return closePop();
   closeMenu();
+  closePop(false);
+  popAnchor = anchor;
   popTarget = target;
+  anchor.setAttribute("aria-expanded", "true");
   renderPop();
+  el.pop.hidden = false;
+  const bounds = el.pop.getBoundingClientRect();
   if (x === undefined) {
     const r = anchor.getBoundingClientRect();
-    x = r.left;
-    y = r.bottom + 6;
+    x = r.left + (r.width - bounds.width) / 2;
+    y = r.bottom + 8;
+    if (y + bounds.height > innerHeight - 8) y = r.top - bounds.height - 8;
   }
   place(el.pop, x, y);
+  (el.pop.querySelector(".pop-shape.on") || el.pop.querySelector(".pop-tab")).focus({ preventScroll: true });
 }
 
-function closePop() {
+function closePop(restoreFocus = true) {
   el.pop.hidden = true;
+  popAnchor?.setAttribute("aria-expanded", "false");
+  if (restoreFocus) popAnchor?.focus({ preventScroll: true });
   popTarget = null;
+  popAnchor = null;
 }
 
 function renderPop() {
   if (!popTarget) return;
+  const focused = document.activeElement?.dataset.choice;
   const chosen = popTarget.look || {};
   const derived = Avatar.derive(popTarget.name);
   const shapeNow = chosen.shape || derived.shape;
   const colorNow = chosen.color || derived.color;
+  el.pop.setAttribute("aria-busy", String(avatarSaving));
 
   el.popShapes.replaceChildren();
   for (const shape of Avatar.SHAPES) {
+    const selected = !chosen.photo && shape === shapeNow;
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "pop-shape" + (shape === shapeNow ? " on" : "");
+    b.className = "pop-shape" + (selected ? " on" : "");
     b.title = shape;
+    b.dataset.choice = shape;
+    b.setAttribute("aria-label", shape);
+    b.setAttribute("aria-pressed", String(selected));
     b.innerHTML = Avatar.svg(popTarget.name, { shape, color: colorNow });
     b.onclick = () => choose({ shape });
     el.popShapes.append(b);
@@ -458,58 +477,95 @@ function renderPop() {
 
   el.popColors.replaceChildren();
   for (const color of Avatar.COLOR_ORDER) {
+    const selected = !chosen.photo && color === colorNow;
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "pop-color" + (color === colorNow ? " on" : "");
-    b.title = color;
+    b.className = "pop-color" + (selected ? " on" : "");
+    b.title = color === "white" ? "Neutral" : color;
+    b.dataset.choice = color;
+    b.setAttribute("aria-label", b.title);
+    b.setAttribute("aria-pressed", String(selected));
     b.style.background = Avatar.COLORS[color];
     b.onclick = () => choose({ color });
     el.popColors.append(b);
+  }
+  for (const button of el.pop.querySelectorAll("button")) button.disabled = avatarSaving;
+  if (focused && !avatarSaving) {
+    [...el.pop.querySelectorAll("[data-choice]")].find((b) => b.dataset.choice === focused)?.focus({ preventScroll: true });
   }
 }
 
 // choose applies one half of a look and leaves the other alone, so clicking a
 // colour does not throw away the shape you just picked.
 async function choose(part) {
-  if (!popTarget) return;
-  const derived = Avatar.derive(popTarget.name);
-  const now = popTarget.look || {};
+  if (!popTarget || avatarSaving) return;
+  const target = popTarget;
+  const derived = Avatar.derive(target.name);
+  const now = target.look || {};
   const shape = part.shape || now.shape || derived.shape;
   const color = part.color || now.color || derived.color;
-  popTarget.look = { shape, color, photo: "" };
+  avatarSaving = true;
+  target.look = { shape, color, photo: "" };
   renderPop();
   try {
-    if (popTarget.kind === "room") await call("SetAvatar", popTarget.id, shape, color);
+    if (target.kind === "room") await call("SetAvatar", target.id, shape, color);
     else await call("SetProfileAvatar", shape, color);
   } catch (err) {
+    target.look = now;
     oops(err);
+  } finally {
+    avatarSaving = false;
+    renderPop();
+    if (popTarget === target) el.pop.querySelector(`[data-choice="${part.shape ? shape : color}"]`)?.focus({ preventScroll: true });
   }
 }
 
 for (const tab of el.pop.querySelectorAll(".pop-tab")) {
   tab.onclick = async () => {
     const kind = tab.dataset.tab;
-    for (const other of el.pop.querySelectorAll(".pop-tab")) other.classList.toggle("on", other === tab && kind === "bot");
-    if (kind === "bot" || !popTarget) return; // the grid is already what "Bot" shows
+    if (kind === "bot" || !popTarget || avatarSaving) return;
     const target = popTarget;
     try {
       if (kind === "shuffle") {
-        const shape = Avatar.SHAPES[Math.floor(Math.random() * Avatar.SHAPES.length)];
-        const pool = Avatar.COLOR_ORDER.filter((c) => c !== "black");
-        await choose({ shape, color: pool[Math.floor(Math.random() * pool.length)] });
-      } else if (kind === "upload") {
-        closePop();
-        await call("PickPhoto", target.kind === "room" ? target.id : "");
-      } else if (kind === "reset") {
-        closePop();
-        if (target.kind === "room") await call("SetAvatar", target.id, "", "");
-        else await call("ClearProfile");
+        const derived = Avatar.derive(target.name);
+        const current = { shape: target.look?.shape || derived.shape, color: target.look?.color || derived.color };
+        const pairs = Avatar.SHAPES.flatMap((shape) => Avatar.COLOR_ORDER
+          .filter((color) => shape !== current.shape || color !== current.color)
+          .map((color) => ({ shape, color })));
+        await choose(pairs[Math.floor(Math.random() * pairs.length)]);
+      } else {
+        avatarSaving = true;
+        renderPop();
+        if (kind === "upload") {
+          await call("PickPhoto", target.kind === "room" ? target.id : "");
+        } else if (kind === "reset") {
+          if (target.kind === "room") await call("SetAvatar", target.id, "", "");
+          else await call("ClearProfile");
+        }
+        if (popTarget === target) closePop();
       }
     } catch (err) {
       oops(err);
+    } finally {
+      avatarSaving = false;
+      renderPop();
     }
   };
 }
+
+// Keep Tab inside the picker; Escape returns to the button that opened it.
+el.pop.addEventListener("keydown", (e) => {
+  if (e.key !== "Tab") return;
+  const buttons = [...el.pop.querySelectorAll("button:not(:disabled)")];
+  if (!buttons.length) { e.preventDefault(); return; }
+  const first = buttons[0], last = buttons[buttons.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault(); last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault(); first.focus();
+  }
+});
+window.addEventListener("resize", () => closePop(false));
 
 $("foot-me").onclick = (e) =>
   openPop(e.currentTarget, {
@@ -521,7 +577,7 @@ $("foot-me").onclick = (e) =>
 // One click anywhere else puts both floating things away.
 document.addEventListener("mousedown", (e) => {
   if (!el.menu.hidden && !el.menu.contains(e.target)) closeMenu();
-  if (!el.pop.hidden && !el.pop.contains(e.target) && !e.target.closest("#foot-me,#pane-avatar-btn")) closePop();
+  if (!el.pop.hidden && !el.pop.contains(e.target) && !e.target.closest("#foot-me,#pane-avatar-btn")) closePop(false);
 });
 
 // ------------------------------------------------------------------ stream
