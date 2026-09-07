@@ -40,7 +40,10 @@ make
 
 For people who would rather not install Go, download the app or CLI from the
 [latest GitHub release](https://github.com/justin06lee/grokbox/releases/latest).
-The macOS desktop app is `grokbox-app-macos.zip`; it includes the app icon.
+The macOS desktop app is `grokbox-app-macos.zip`; it unzips to **Grok Box.app**
+— drag that to `/Applications` — and it includes the app icon. The command, the
+binary inside the bundle and the bundle id all stay `grokbox`; only what the
+Finder puts under the icon is the name you read.
 
 To prepare a release, `make dist VERSION=v0.5.0` cross-compiles CLI binaries
 for macOS, Linux and Windows into `./dist`. Then `make app-dist VERSION=v0.5.0`

@@ -154,12 +154,19 @@ clean: app-clean
 # of the protocol and one of the certificate pinning.
 
 APP_NAME   := grokbox
-# What a person reads: the menu bar, the dock, the Finder. The binary, the
-# bundle directory and the CLI stay grokbox so `open -a` and pkill keep working.
+# What a person reads: the menu bar, the dock, and — because the Finder labels
+# an app with its file name, not CFBundleName — the bundle directory too. An
+# app called "Grok Box" everywhere except the one place people go looking for
+# it was the whole of the confusion. The binary inside, the bundle id and the
+# CLI all stay grokbox, so pkill patterns and `open -b` still find it.
 APP_LABEL  := Grok Box
 APP_ID     := com.grokbox.app
 APP_DIR    := app
-APP_BUNDLE := $(APP_DIR)/bin/$(APP_NAME).app
+APP_BUNDLE := $(APP_DIR)/bin/$(APP_LABEL).app
+# Where it lands, and what it was called before the rename, so an upgrade does
+# not leave two of them in /Applications for the Finder to number.
+APP_DEST   := /Applications/$(APP_LABEL).app
+APP_WAS    := /Applications/$(APP_NAME).app
 # 13.0 is what the Wails Objective-C sources are built for; saying so here is
 # what silences a screenful of linker warnings about mismatched versions.
 export MACOSX_DEPLOYMENT_TARGET := 13.0
@@ -168,7 +175,7 @@ app: app-quit app-build app-bundle app-install
 	@echo
 	@echo "  $(APP_LABEL) $(VERSION) — the desktop app"
 ifeq ($(shell uname -s),Darwin)
-	@open -a /Applications/$(APP_NAME).app
+	@open -a "$(APP_DEST)"
 	@echo "  opened from /Applications. It stays in the menu bar when you close the window."
 else
 	@echo "  installed to $(BINDIR)/$(APP_NAME)-app"
@@ -183,9 +190,9 @@ app-build:
 # and the dock badge needs something to sit on. Everywhere else this is a no-op.
 app-bundle:
 ifeq ($(shell uname -s),Darwin)
-	@rm -rf $(APP_BUNDLE) $(APP_DIR)/bin/icon.iconset
-	@mkdir -p $(APP_BUNDLE)/Contents/MacOS $(APP_BUNDLE)/Contents/Resources
-	@cp $(APP_DIR)/bin/$(APP_NAME) $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
+	@rm -rf "$(APP_BUNDLE)" "$(APP_DIR)/bin/$(APP_NAME).app" $(APP_DIR)/bin/icon.iconset
+	@mkdir -p "$(APP_BUNDLE)/Contents/MacOS" "$(APP_BUNDLE)/Contents/Resources"
+	@cp $(APP_DIR)/bin/$(APP_NAME) "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"
 	@mkdir -p $(APP_DIR)/bin/icon.iconset
 	@for size in 16 32 128 256 512; do \
 		sips -z $$size $$size $(APP_DIR)/build/icon.png \
@@ -193,7 +200,7 @@ ifeq ($(shell uname -s),Darwin)
 		sips -z $$(($$size * 2)) $$(($$size * 2)) $(APP_DIR)/build/icon.png \
 			--out $(APP_DIR)/bin/icon.iconset/icon_$${size}x$${size}@2x.png >/dev/null; \
 	done
-	@iconutil -c icns $(APP_DIR)/bin/icon.iconset -o $(APP_BUNDLE)/Contents/Resources/icon.icns
+	@iconutil -c icns $(APP_DIR)/bin/icon.iconset -o "$(APP_BUNDLE)/Contents/Resources/icon.icns"
 	@printf '%s\n' \
 		'<?xml version="1.0" encoding="UTF-8"?>' \
 		'<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
@@ -209,9 +216,9 @@ ifeq ($(shell uname -s),Darwin)
 		'  <key>LSMinimumSystemVersion</key><string>13.0</string>' \
 		'  <key>NSHighResolutionCapable</key><true/>' \
 		'</dict></plist>' \
-		> $(APP_BUNDLE)/Contents/Info.plist
+		> "$(APP_BUNDLE)/Contents/Info.plist"
 	@rm -rf $(APP_DIR)/bin/icon.iconset
-	@codesign --force --sign - --identifier $(APP_ID) $(APP_BUNDLE) 2>/dev/null \
+	@codesign --force --sign - --identifier $(APP_ID) "$(APP_BUNDLE)" 2>/dev/null \
 		|| echo "  note: could not sign the bundle; notifications will use the fallback"
 endif
 
@@ -220,8 +227,8 @@ endif
 # copy in place is what makes a rebuilt app stop being allowed to notify.
 app-install: app-bundle
 ifeq ($(shell uname -s),Darwin)
-	@rm -rf /Applications/$(APP_NAME).app
-	@cp -R $(APP_BUNDLE) /Applications/$(APP_NAME).app
+	@rm -rf "$(APP_DEST)" "$(APP_WAS)"
+	@cp -R "$(APP_BUNDLE)" "$(APP_DEST)"
 else
 	@mkdir -p $(BINDIR)
 	install -m 0755 $(APP_DIR)/bin/$(APP_NAME) $(BINDIR)/$(APP_NAME)-app
@@ -240,8 +247,8 @@ endif
 
 app-quit:
 ifeq ($(shell uname -s),Darwin)
-	@osascript -e 'quit app "$(APP_NAME)"' 2>/dev/null || true
-	@pkill -f "$(APP_NAME).app/Contents/MacOS/$(APP_NAME)" 2>/dev/null || true
+	@osascript -e 'quit app "$(APP_LABEL)"' 2>/dev/null || true
+	@pkill -f "Contents/MacOS/$(APP_NAME)" 2>/dev/null || true
 else
 	@pkill -f "$(APP_NAME)-app" 2>/dev/null || true
 endif
@@ -252,7 +259,7 @@ endif
 app-dist: app-build app-bundle
 	@mkdir -p dist
 ifeq ($(shell uname -s),Darwin)
-	@cd $(APP_DIR)/bin && zip -qry ../../dist/$(APP_NAME)-app-macos.zip $(APP_NAME).app
+	@cd $(APP_DIR)/bin && zip -qry ../../dist/$(APP_NAME)-app-macos.zip "$(APP_LABEL).app"
 	@echo "  dist/$(APP_NAME)-app-macos.zip"
 endif
 	@GOOS=windows GOARCH=amd64 CGO_ENABLED=0 sh -c 'cd $(APP_DIR) && go build -trimpath -ldflags "$(LDFLAGS)" -o ../dist/$(APP_NAME)-app-windows-amd64.exe .'
