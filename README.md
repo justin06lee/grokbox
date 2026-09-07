@@ -38,10 +38,16 @@ anywhere:
 make
 ```
 
-For people who would rather not install Go, `make dist` cross-compiles binaries
-for macOS, Linux and Windows into `./dist`, and `make app-dist` does the same
-for the desktop app; `gh release create v0.4.0 dist/*` puts them where others
-can download them.
+For people who would rather not install Go, download the app or CLI from the
+[latest GitHub release](https://github.com/justin06lee/grokbox/releases/latest).
+The macOS desktop app is `grokbox-app-macos.zip`; it includes the app icon.
+
+To prepare a release, `make dist VERSION=v0.5.0` cross-compiles CLI binaries
+for macOS, Linux and Windows into `./dist`. Then `make app-dist VERSION=v0.5.0`
+builds the desktop downloads with the same version and current icon assets.
+Publish those files from the matching source tag with
+`gh release create v0.5.0 --verify-tag dist/*`. Release downloads are built
+artifacts: pushing source or icon changes alone does not update them.
 
 ## Host a room
 
