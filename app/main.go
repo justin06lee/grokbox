@@ -59,7 +59,10 @@ func main() {
 	dk := dock.New()
 
 	app := application.New(application.Options{
-		Name:        "grokbox",
+		// The name macOS shows: in the menu bar, the dock, and the
+		// notification banners. The binary, the bundle and the CLI stay
+		// "grokbox" — this is only what a person reads.
+		Name:        "Grok Box",
 		Description: "A chat room behind a key.",
 		Icon:        appIcon,
 		Services: []application.Service{
@@ -86,18 +89,19 @@ func main() {
 
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:             "main",
-		Title:            "grokbox",
+		Title:            "Grok Box",
 		Width:            1080,
 		Height:           720,
 		MinWidth:         720,
 		MinHeight:        460,
-		BackgroundColour: application.NewRGB(255, 255, 255),
+		BackgroundColour: application.NewRGB(252, 252, 252), // --sand-bg-base
 		URL:              "/",
 		Mac: application.MacWindow{
 			// The room header sits under the traffic lights, so the window
-			// reads as one surface rather than a web page in a frame.
+			// reads as one surface rather than a web page in a frame. 48pt
+			// is the strip Grok Bot leaves above its search field.
 			TitleBar:                application.MacTitleBarHiddenInset,
-			InvisibleTitleBarHeight: 44,
+			InvisibleTitleBarHeight: 48,
 		},
 	})
 
@@ -128,11 +132,11 @@ func main() {
 	} else {
 		tray.SetIcon(trayIcon)
 	}
-	tray.SetTooltip("grokbox")
+	tray.SetTooltip("Grok Box")
 	menu := app.NewMenu()
-	menu.Add("Open grokbox").OnClick(func(*application.Context) { show() })
+	menu.Add("Open Grok Box").OnClick(func(*application.Context) { show() })
 	menu.AddSeparator()
-	menu.Add("Quit grokbox").OnClick(func(*application.Context) { app.Quit() })
+	menu.Add("Quit Grok Box").OnClick(func(*application.Context) { app.Quit() })
 	tray.SetMenu(menu)
 	tray.OnClick(show)
 	rooms.tray = tray
