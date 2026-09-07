@@ -273,3 +273,13 @@ endif
 
 app-clean:
 	rm -rf $(APP_DIR)/bin
+
+# A portable demo, ready to double-click or share. No server or account needed.
+.PHONY: demo
+demo:
+	bun run app/demo-build.ts
+
+# Build a separate native presentation without replacing the installed app.
+.PHONY: app-demo
+app-demo: demo
+	$(MAKE) app-build app-bundle APP_LABEL='Grok Box Demo' APP_ID=com.grokbox.demo LDFLAGS='$(LDFLAGS) -X main.demoMode=1'
