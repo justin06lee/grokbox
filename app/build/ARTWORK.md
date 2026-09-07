@@ -31,12 +31,25 @@ The original generated exterior contained a painted checkerboard, so the
 production source uses opaque full-bleed artwork. Transparency and icon
 geometry are supplied by the SVG wrapper, independently of generation.
 
-## Final production prompt
+## Current expressions and silhouettes
 
-Built-in imagegen edit, using the first generated group icon as its reference:
+Blue has one closed wink and one upright eye; green has two happy `^^` eyes;
+red has opposing diagonal slots following its existing head angle. Blue and
+silver use rounder silhouettes, and the speech bubble follows the top-right
+curve of the app tile. The outer mask and 100-pixel inset are unchanged.
 
-> Precise production artwork edit: return ONLY the interior artwork of this app icon as a FULL-BLEED OPAQUE SQUARE IMAGE. This is a texture that our macOS app build will clip into a squircle and add its own transparent padding. So remove the checkerboard and remove ALL outer margin, padding, drop shadow and rounded tile corners. ZOOM/CROP to the dark tile to fill the entire image edge-to-edge, and extend the dark charcoal color into all FOUR corners to make a perfectly solid square. Every pixel of the output canvas must be artwork, zero checkerboard or white backdrop. Keep the exact four buddy composition, identities, silver/green/blue/coral colors, beautiful sculpted finish, all eight black pill eyes, and ivory three-dot speech bubble from the reference. Preserve positions and proportions inside the tile. The silver buddy at lower left and coral buddy at lower right run cleanly off the bottom edge; the charcoal tile fills every top and side corner. No outer roundness, no icon mockup framing, no margin, no border. A square 1024x1024 full bleed texture of just the artwork.
+## Latest edit prompt
 
-Final refinement, using that full-bleed output as the reference:
+Built-in imagegen edit using the previous full-bleed artwork, the user’s
+annotated icon, and their orange-face eye reference.
 
-> Precise object edit of this full-bleed square app-icon texture. Change ONLY the speech bubble: shrink it by about 15 percent and move it left so there is a clear dark charcoal gap of about 8 percent of the entire canvas width between its rightmost edge and the right canvas edge. Keep its top at about the same height, and preserve the three inset black dots, ivory material and short down-left tail. Keep EVERYTHING ELSE pixel-faithful: all four blue/green/silver/coral sculpted buddy domes, every eye, lighting, arrangement, scale and cropping. Preserve the full-bleed opaque square format, including the charcoal top corners; do not add rounded outer corners, margins, background, text or checkerboard. Only the bubble needs more breathing room so it will survive a rounded macOS icon mask.
+> Use case: precise-object-edit. Edit image 1, the production full-bleed opaque square texture for the grokbox macOS app icon. Image 2 is the user's annotated screenshot of the final rounded icon; its colored strokes are instructions, never artwork. Image 3 is a reference ONLY for the red buddy's eye expression. Preserve the current four-buddy group, colors, sculpted satin ceramic finish, soft lighting, black inset eyes and dark charcoal backdrop.
+>
+> Make these five deliberate refinements:
+> 1. BLUE BUDDY: It must read as a round sphere, not a vertical wall. Shift the blue sphere a little down and left, and round its lower-left silhouette into a clean circular arc that disappears behind the silver sphere. Eliminate the tiny charcoal gap/notch where blue meets silver at the left edge. Keep both eyes visible. Give blue a wink: its left eye is a short nearly horizontal, slightly curved closed-eye slit; its right eye stays an upright rounded pill. Keep the existing head orientation.
+> 2. GREEN BUDDY: Replace its two pill eyes with two happy CLOSED eyes shaped like ^ ^, soft rounded upward arches/chevrons. These are the ONLY two eyes, no extra eyebrows and no mouth. Black recessed strokes, thick enough to read at Dock size, projected onto the existing tilted spherical face.
+> 3. RED BUDDY: Replace the two parallel pills with two short rounded diagonal eye slots like / \ (left slot rises toward the right, right slot falls toward the right). Match the expression of the orange-face reference image 3, adapted to the current red sphere's existing facing direction and overall rotation. Keep its spherical body and red color.
+> 4. SILVER BUDDY: Preserve its two existing eyes and overall pose. Round its lower-right boundary into a convincing circular/spherical arc: the right edge must curve back LEFT as it approaches the bottom, revealing a slim crescent of the red sphere beside and below it, exactly where the small white annotation in image 2 points. Remove the straight squared-off lower-right corner, while keeping the silver buddy big and in the foreground.
+> 5. SPEECH BUBBLE: Align it thoughtfully with the final app icon's rounded upper-right corner, as the two arrows in image 2 indicate. Place its top and right edges at balanced equal insets from the final tile edges (roughly 7 percent of the texture canvas). Shape its top-right curve to follow the same concentric rounded sweep as the macOS tile's top-right corner. A slightly taller rounded square bubble is fine; keep the short down-left tail and exactly three black inset dots. Ensure generous clearance so our outer squircle mask will not clip it.
+>
+> OUTPUT FORMAT IS CRITICAL: Return a FULL-BLEED OPAQUE SQUARE TEXTURE like image 1, with artwork covering every pixel; charcoal fills the top corners, foreground spheres run off the bottom edge. Our build script adds the rounded tile mask and transparent outside margins. Do NOT add an outer rounded-square silhouette, margin, padding, checkerboard, white border or transparency. No annotation strokes, arrows, text, mouths, extra buddies, or additional objects. Preserve everything not explicitly changed.
