@@ -280,6 +280,20 @@ demo:
 	bun run app/demo-build.ts
 
 # Build a separate native presentation without replacing the installed app.
+# APP_NAME changes too: sharing bin/grokbox with the real app would leave a
+# demo-only binary sitting where the next app-dist expects the real one.
 .PHONY: app-demo
 app-demo: demo
-	$(MAKE) app-build app-bundle APP_LABEL='Grok Box Demo' APP_ID=com.grokbox.demo LDFLAGS='$(LDFLAGS) -X main.demoMode=1'
+	$(MAKE) app-build app-bundle APP_NAME=grokbox-demo APP_LABEL='Grok Box Demo' APP_ID=com.grokbox.demo LDFLAGS='$(LDFLAGS) -X main.demoMode=1'
+
+# The demo as release downloads. The single HTML file is the one to hand
+# somebody: it opens in a browser, so it has no bundle to unzip and nothing
+# for Gatekeeper to quarantine.
+.PHONY: demo-dist
+demo-dist: app-demo
+	@mkdir -p dist
+ifeq ($(shell uname -s),Darwin)
+	@cd $(APP_DIR)/bin && zip -qry "../../dist/$(BINARY)-demo-app-macos.zip" "Grok Box Demo.app"
+	@echo "  dist/$(BINARY)-demo-app-macos.zip"
+endif
+	@echo "  dist/Grok Box Demo.html"

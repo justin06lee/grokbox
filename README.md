@@ -45,19 +45,25 @@ The macOS desktop app is `grokbox-app-macos.zip`; it unzips to **Grok Box.app**
 binary inside the bundle and the bundle id all stay `grokbox`; only what the
 Finder puts under the icon is the name you read.
 
-To prepare a release, `make dist VERSION=v0.5.1` cross-compiles CLI binaries
-for macOS, Linux and Windows into `./dist`. Then `make app-dist VERSION=v0.5.1`
-builds the desktop downloads with the same version and current icon assets.
-Publish those files from the matching source tag with
-`gh release create v0.5.1 --verify-tag dist/*`. Release downloads are built
-artifacts: pushing source or icon changes alone does not update them.
+To see what the app is before installing anything, download **Grok Box
+Demo.html** from the same release and open it. It is one self-contained file
+that runs the real interface in a browser — no unzip, nothing for Gatekeeper
+to quarantine, no account and no server.
+
+To prepare a release, `make dist VERSION=v0.5.2` cross-compiles CLI binaries
+for macOS, Linux and Windows into `./dist`. Then `make app-dist VERSION=v0.5.2`
+builds the desktop downloads with the same version and current icon assets, and
+`make demo-dist VERSION=v0.5.2` adds the demo. Publish those files from the
+matching source tag with `gh release create v0.5.2 --verify-tag dist/*`.
+Release downloads are built artifacts: pushing source or icon changes alone
+does not update them.
 
 ## Host a room
 
 ```console
 $ grokbox serve
 
-grokbox v0.5.1 — listening on :7777
+grokbox v0.5.2 — listening on :7777
 reachable at https://203.0.113.9:7777   (public — anyone with the invite can reach it)
 
   room    lounge
@@ -368,8 +374,10 @@ launchctl load ~/Library/LaunchAgents/sh.grokbox.notify.plist
 
 ## Peer room demo
 
-`make demo` creates **dist/Grok Box Demo.html**, a single offline file you can
-open in a browser. It uses the actual desktop app’s markup, stylesheet,
+The quickest way to see it is to download **Grok Box Demo.html** from the
+[latest release](https://github.com/justin06lee/grokbox/releases/latest) and
+double-click it. To build it yourself, `make demo` creates that same
+**dist/Grok Box Demo.html**, a single offline file you can open in a browser. It uses the actual desktop app’s markup, stylesheet,
 avatars, message renderer, composer, and settings. No presentation controls
 or demo labels appear inside the window.
 
