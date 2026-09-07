@@ -1,11 +1,13 @@
-// The window. Everything it can ask for goes through API in api.go; the two
+// The window. Everything it can ask for goes through API in api.go; the three
 // events it listens to are the only things Go pushes at it.
 //
 // The shell is Grok Bot's: a 280pt room list with a search field, a bare
-// header, grey bubbles for other people and a near-black one for you, and a
-// pill composer. style.css records where each measurement came from.
+// header, grey bubbles for other people and a near-black one for you, a pill
+// composer, a settings pane on the right, and a right-click menu on a room.
+// style.css records where each measurement came from.
 
 import { Call, Events } from "/wails/runtime.js";
+import * as Avatar from "/avatar.js";
 
 const call = (method, ...args) => Call.ByName("main.API." + method, ...args);
 
@@ -22,9 +24,8 @@ const el = {
   composer: $("composer"),
   input: $("input"),
   send: $("send"),
-  members: $("members"),
   memberList: $("member-list"),
-  membersBtn: $("members-btn"),
+  settingsBtn: $("settings-btn"),
   modal: $("modal"),
   invite: $("invite"),
   joinName: $("join-name"),
@@ -34,23 +35,48 @@ const el = {
   version: $("version"),
   meAvatar: $("me-avatar"),
   meName: $("me-name"),
+  hiddenRow: $("hidden-row"),
+  hiddenLabel: $("hidden-label"),
+  menu: $("menu"),
+  pop: $("pop"),
+  popShapes: $("pop-shapes"),
+  popColors: $("pop-colors"),
+  pane: $("pane"),
+  paneAvatar: $("pane-avatar"),
+  paneNick: $("pane-nick"),
+  paneRealName: $("pane-realname"),
+  paneYou: $("pane-you"),
+  paneInvite: $("pane-invite"),
+  paneFp: $("pane-fp"),
+  paneNotify: $("pane-notify"),
+  paneLeave: $("pane-leave"),
 };
 
 let rooms = [];
 let activeId = null;
-let showMembers = false;
+let current = null; // the open room, as Open() described it
+let profile = { login: "", photo: "", shape: "", color: "" };
 let filter = "";
+let showHidden = false;
+let paneOpen = false;
+let popTarget = null; // what the avatar picker is dressing
 let group = { from: null, at: 0, day: "" }; // what the last rendered row was
+
+// look is the three things that decide how something is drawn.
+const look = (r) => ({ shape: r.shape, color: r.color, photo: r.photo });
 
 // ------------------------------------------------------------------- start
 
 async function boot() {
   el.version.textContent = await call("Version");
+  profile = (await call("Profile")) || profile;
   rooms = (await call("Rooms")) || [];
   renderRooms();
-  const first = rooms.find((r) => r.mentioned) || rooms.find((r) => r.unread > 0) || rooms[0];
-  if (first) await openRoom(first.id);
-  else {
+  const visible = rooms.filter((r) => !r.hidden);
+  const first = visible.find((r) => r.mentioned) || visible.find((r) => r.unread > 0) || visible[0];
+  if (first) {
+    await openRoom(first.id);
+  } else {
     showEmpty(true);
     // Nothing has asked for the keyboard, and the webview will hand it to the
     // first field it finds — which would light up the search box on a window
@@ -64,10 +90,12 @@ Events.On("grokbox:rooms", (e) => {
   renderRooms();
   const room = rooms.find((r) => r.id === activeId);
   if (room) {
-    renderHeader(room);
-    renderMembers(room);
+    current = { ...current, ...room };
+    renderHeader(current);
+    renderPane();
   } else if (activeId) {
     activeId = null;
+    current = null;
     showEmpty(true);
   }
 });
@@ -80,30 +108,40 @@ Events.On("grokbox:message", (e) => {
   if (stick) scrollToEnd();
 });
 
+Events.On("grokbox:profile", (e) => {
+  profile = e.data || profile;
+  renderMe();
+});
+
 // ----------------------------------------------------------------- sidebar
 
 function renderRooms() {
   el.rooms.replaceChildren();
   for (const r of rooms) {
+    if (r.hidden && !showHidden) continue;
     if (!matches(r)) continue;
     const btn = document.createElement("button");
-    btn.className = "room" + (r.id === activeId ? " active" : "") + (r.connected ? "" : " offline");
+    btn.className =
+      "room" + (r.id === activeId ? " active" : "") + (r.connected ? "" : " offline") + (r.hidden ? " dimmed" : "");
+    btn.dataset.id = r.id;
     btn.onclick = () => openRoom(r.id);
     btn.oncontextmenu = (ev) => {
       ev.preventDefault();
-      if (confirm(`Leave ${r.room}?\n\nYou will need the invite code to come back.`)) {
-        call("Leave", r.id).catch((err) => toast(String(err)));
-      }
+      roomMenu(r, ev.clientX, ev.clientY);
     };
-    btn.append(avatar(r.room), roomText(r));
+    btn.append(Avatar.node(r.room, look(r)), roomText(r));
     el.rooms.append(btn);
   }
+
+  const hidden = rooms.filter((r) => r.hidden).length;
+  el.hiddenRow.hidden = hidden === 0;
+  el.hiddenLabel.textContent = showHidden ? `Hide ${hidden} again` : `Hidden rooms (${hidden})`;
 }
 
 // matches is what the search field does: room name or the line under it.
 function matches(r) {
   if (!filter) return true;
-  const hay = [r.room, r.name, r.last ? r.last.text : "", r.last ? r.last.from : ""];
+  const hay = [r.title, r.room, r.name, r.last ? r.last.text : "", r.last ? r.last.from : ""];
   return hay.some((s) => (s || "").toLowerCase().includes(filter));
 }
 
@@ -115,7 +153,7 @@ function roomText(r) {
   top.className = "room-top";
   const name = document.createElement("span");
   name.className = "room-name";
-  name.textContent = r.room;
+  name.textContent = r.title || r.room;
   const when = document.createElement("span");
   when.className = "room-when";
   when.textContent = r.last ? shortWhen(new Date(r.last.time)) : "";
@@ -148,17 +186,32 @@ el.search.addEventListener("input", () => {
   renderRooms();
 });
 
+el.hiddenRow.onclick = () => {
+  showHidden = !showHidden;
+  renderRooms();
+};
+
+// renderMe draws the footer: your picture, and the name you go by.
+function renderMe() {
+  const name = current ? current.name : profile.login || "you";
+  Avatar.paint(el.meAvatar, name, profile);
+  el.meAvatar.classList.add("big");
+  el.meName.textContent = current ? current.name : profile.login || "Not in a room";
+}
+
 // -------------------------------------------------------------------- room
 
 async function openRoom(id) {
   try {
     const view = await call("Open", id);
     activeId = id;
+    current = view;
     showEmpty(false);
     renderRooms();
     renderHeader(view);
-    renderMembers(view);
     renderStream(view.history || []);
+    if (paneOpen) await loadPane();
+    else renderPane();
     el.input.focus();
   } catch (err) {
     toast(String(err));
@@ -167,37 +220,66 @@ async function openRoom(id) {
 
 function renderHeader(r) {
   el.head.hidden = false;
-  el.name.textContent = r.room;
-  paint(el.headAvatar, r.room);
-  el.input.placeholder = `Message ${r.room}`;
+  el.name.textContent = r.title || r.room;
+  Avatar.paint(el.headAvatar, r.room, look(r));
+  el.headAvatar.classList.add("small");
+  el.input.placeholder = `Message ${r.title || r.room}`;
 
   // Grok Bot's header carries the name and nothing else. The only thing worth
   // interrupting that for is the room not being there.
   el.sub.className = "head-note" + (r.connected ? "" : " warn");
   el.sub.textContent = r.connected ? "" : r.note || "not connected";
-
-  el.meName.textContent = r.name;
-  paint(el.meAvatar, r.name);
+  renderMe();
 }
 
-// paint recolours an avatar span in place, keeping the element the ids point at.
-function paint(span, name) {
-  span.style.background = PALETTE[hash(name) % PALETTE.length];
-  span.textContent = (name || "?").trim().charAt(0).toUpperCase();
-  return span;
+// ------------------------------------------------------------ settings pane
+
+el.settingsBtn.onclick = () => togglePane();
+$("pane-close").onclick = () => togglePane(false);
+
+async function togglePane(want) {
+  paneOpen = want === undefined ? !paneOpen : want;
+  el.settingsBtn.classList.toggle("on", paneOpen);
+  el.pane.hidden = !paneOpen;
+  if (paneOpen) await loadPane();
 }
 
-function renderMembers(r) {
-  el.members.hidden = !showMembers;
-  el.membersBtn.classList.toggle("on", showMembers);
+// loadPane fills the pane and fetches the one thing not already in hand: the
+// invite code, which is rebuilt from the live connection so it always carries
+// the certificate the room is actually pinned to.
+async function loadPane() {
+  renderPane();
+  if (!activeId) return;
+  try {
+    const [code, fp] = await Promise.all([call("Invite", activeId), call("Fingerprint", activeId)]);
+    el.paneInvite.value = code;
+    el.paneFp.textContent = fp || "not pinned";
+  } catch (err) {
+    el.paneInvite.value = "";
+    el.paneFp.textContent = String(err).replace(/^Error:\s*/, "");
+  }
+}
+
+function renderPane() {
+  if (!current) return;
+  Avatar.paint(el.paneAvatar, current.room, look(current));
+  el.paneAvatar.classList.add("huge");
+  if (document.activeElement !== el.paneNick) el.paneNick.value = current.nickname || "";
+  el.paneNick.placeholder = current.room;
+  el.paneRealName.textContent = current.nickname
+    ? `Really called ${current.room}, on ${short(current.server)}`
+    : `On ${short(current.server)}`;
+  el.paneYou.value = current.name;
+  el.paneNotify.checked = !current.quiet;
+
   el.memberList.replaceChildren();
-  for (const m of r.members || []) {
+  for (const m of current.members || []) {
     const li = document.createElement("li");
-    li.append(avatar(m.name, "small"));
+    li.append(Avatar.node(m.name, {}, "small"));
     const name = document.createElement("span");
     name.textContent = m.name;
     li.append(name);
-    if (m.name === r.name) {
+    if (m.name === current.name) {
       const you = document.createElement("span");
       you.className = "you";
       you.textContent = "you";
@@ -207,11 +289,240 @@ function renderMembers(r) {
   }
 }
 
-el.membersBtn.onclick = () => {
-  showMembers = !showMembers;
-  const room = rooms.find((r) => r.id === activeId);
-  if (room) renderMembers(room);
+el.paneNick.addEventListener("change", () => {
+  if (activeId) call("SetNickname", activeId, el.paneNick.value).catch(oops);
+});
+el.paneNick.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    el.paneNick.blur();
+  }
+});
+
+el.paneNotify.addEventListener("change", () => {
+  if (activeId) call("SetQuiet", activeId, !el.paneNotify.checked).catch(oops);
+});
+
+$("pane-copy").onclick = () => copy(el.paneInvite.value, "Invite code copied");
+
+el.paneLeave.onclick = () => {
+  if (!current) return;
+  if (!confirm(`Leave ${current.room}?\n\nYou will need the invite code to come back.`)) return;
+  call("Leave", current.id)
+    .then(() => togglePane(false))
+    .catch(oops);
 };
+
+$("pane-avatar-btn").onclick = (e) => {
+  if (!current) return;
+  openPop(e.currentTarget, { kind: "room", id: current.id, name: current.room, look: look(current) });
+};
+
+// --------------------------------------------------------- the context menu
+
+function icon(d) {
+  return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+}
+
+const ICON = {
+  unread: icon('<path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>'),
+  settings: icon('<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/>'),
+  copy: icon('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>'),
+  hide: icon('<path d="M3 3l18 18M10.6 10.7a2 2 0 0 0 2.7 2.9"/><path d="M9.4 5.2A9.7 9.7 0 0 1 12 5c5 0 9 4.5 9 7a11 11 0 0 1-2.2 3.3M6.3 6.7C3.9 8.3 3 10.6 3 12c0 2.5 4 7 9 7 1.4 0 2.7-.3 3.8-.9"/>'),
+  show: icon('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'),
+  paint: icon('<circle cx="12" cy="12" r="9"/><circle cx="9" cy="9.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="9.5" r="1.3" fill="currentColor" stroke="none"/>'),
+  leave: icon('<path d="M6 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-2"/><path d="M3 12h11M11 8l4 4-4 4"/>'),
+};
+
+function roomMenu(r, x, y) {
+  openMenu(x, y, [
+    { icon: ICON.unread, label: "Mark as Unread", run: () => call("MarkUnread", r.id).catch(oops) },
+    {
+      icon: ICON.paint,
+      label: "Change picture",
+      run: () => {
+        const row = [...el.rooms.children].find((c) => c.dataset.id === r.id);
+        openPop(row || el.rooms, { kind: "room", id: r.id, name: r.room, look: look(r) }, x, y);
+      },
+    },
+    {
+      icon: ICON.settings,
+      label: "Room settings",
+      run: async () => {
+        if (r.id !== activeId) await openRoom(r.id);
+        togglePane(true);
+      },
+    },
+    "-",
+    {
+      icon: ICON.copy,
+      label: "Copy invite code",
+      run: () => call("Invite", r.id).then((code) => copy(code, "Invite code copied")).catch(oops),
+    },
+    { icon: ICON.copy, label: "Copy room ID", run: () => copy(r.id, "Room ID copied") },
+    "-",
+    {
+      icon: r.hidden ? ICON.show : ICON.hide,
+      label: r.hidden ? "Show in sidebar" : "Hide from sidebar",
+      run: () => call("SetHidden", r.id, !r.hidden).catch(oops),
+    },
+    {
+      icon: ICON.leave,
+      label: "Leave room",
+      danger: true,
+      run: () => {
+        if (confirm(`Leave ${r.room}?\n\nYou will need the invite code to come back.`)) {
+          call("Leave", r.id).catch(oops);
+        }
+      },
+    },
+  ]);
+}
+
+function openMenu(x, y, items) {
+  el.menu.replaceChildren();
+  for (const it of items) {
+    if (it === "-") {
+      const hr = document.createElement("div");
+      hr.className = "menu-sep";
+      el.menu.append(hr);
+      continue;
+    }
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "menu-item" + (it.danger ? " danger" : "");
+    b.innerHTML = it.icon;
+    const label = document.createElement("span");
+    label.textContent = it.label;
+    b.append(label);
+    b.onclick = () => {
+      closeMenu();
+      it.run();
+    };
+    el.menu.append(b);
+  }
+  place(el.menu, x, y);
+}
+
+// place puts a floating panel at a point, folding it back inside the window
+// when it would hang off an edge.
+function place(node, x, y) {
+  node.hidden = false;
+  node.style.left = "0px";
+  node.style.top = "0px";
+  const r = node.getBoundingClientRect();
+  node.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + "px";
+  node.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + "px";
+}
+
+function closeMenu() {
+  el.menu.hidden = true;
+}
+
+// ------------------------------------------------------- the avatar picker
+
+function openPop(anchor, target, x, y) {
+  closeMenu();
+  popTarget = target;
+  renderPop();
+  if (x === undefined) {
+    const r = anchor.getBoundingClientRect();
+    x = r.left;
+    y = r.bottom + 6;
+  }
+  place(el.pop, x, y);
+}
+
+function closePop() {
+  el.pop.hidden = true;
+  popTarget = null;
+}
+
+function renderPop() {
+  if (!popTarget) return;
+  const chosen = popTarget.look || {};
+  const derived = Avatar.derive(popTarget.name);
+  const shapeNow = chosen.shape || derived.shape;
+  const colorNow = chosen.color || derived.color;
+
+  el.popShapes.replaceChildren();
+  for (const shape of Avatar.SHAPES) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pop-shape" + (shape === shapeNow ? " on" : "");
+    b.title = shape;
+    b.innerHTML = Avatar.svg(popTarget.name, { shape, color: colorNow });
+    b.onclick = () => choose({ shape });
+    el.popShapes.append(b);
+  }
+
+  el.popColors.replaceChildren();
+  for (const color of Avatar.COLOR_ORDER) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pop-color" + (color === colorNow ? " on" : "");
+    b.title = color;
+    b.style.background = Avatar.COLORS[color];
+    b.onclick = () => choose({ color });
+    el.popColors.append(b);
+  }
+}
+
+// choose applies one half of a look and leaves the other alone, so clicking a
+// colour does not throw away the shape you just picked.
+async function choose(part) {
+  if (!popTarget) return;
+  const derived = Avatar.derive(popTarget.name);
+  const now = popTarget.look || {};
+  const shape = part.shape || now.shape || derived.shape;
+  const color = part.color || now.color || derived.color;
+  popTarget.look = { shape, color, photo: "" };
+  renderPop();
+  try {
+    if (popTarget.kind === "room") await call("SetAvatar", popTarget.id, shape, color);
+    else await call("SetProfileAvatar", shape, color);
+  } catch (err) {
+    oops(err);
+  }
+}
+
+for (const tab of el.pop.querySelectorAll(".pop-tab")) {
+  tab.onclick = async () => {
+    const kind = tab.dataset.tab;
+    for (const other of el.pop.querySelectorAll(".pop-tab")) other.classList.toggle("on", other === tab && kind === "bot");
+    if (kind === "bot" || !popTarget) return; // the grid is already what "Bot" shows
+    const target = popTarget;
+    try {
+      if (kind === "shuffle") {
+        const shape = Avatar.SHAPES[Math.floor(Math.random() * Avatar.SHAPES.length)];
+        const pool = Avatar.COLOR_ORDER.filter((c) => c !== "black");
+        await choose({ shape, color: pool[Math.floor(Math.random() * pool.length)] });
+      } else if (kind === "upload") {
+        closePop();
+        await call("PickPhoto", target.kind === "room" ? target.id : "");
+      } else if (kind === "reset") {
+        closePop();
+        if (target.kind === "room") await call("SetAvatar", target.id, "", "");
+        else await call("ClearProfile");
+      }
+    } catch (err) {
+      oops(err);
+    }
+  };
+}
+
+$("foot-me").onclick = (e) =>
+  openPop(e.currentTarget, {
+    kind: "profile",
+    name: current ? current.name : profile.login || "you",
+    look: { shape: profile.shape, color: profile.color, photo: profile.photo },
+  });
+
+// One click anywhere else puts both floating things away.
+document.addEventListener("mousedown", (e) => {
+  if (!el.menu.hidden && !el.menu.contains(e.target)) closeMenu();
+  if (!el.pop.hidden && !el.pop.contains(e.target) && !e.target.closest("#foot-me,#pane-avatar-btn")) closePop();
+});
 
 // ------------------------------------------------------------------ stream
 
@@ -256,7 +567,7 @@ function addMessage(m) {
   if (!same && !m.mine && m.kind !== "action") {
     const who = document.createElement("div");
     who.className = "who";
-    who.append(avatar(m.from, "tiny"));
+    who.append(Avatar.node(m.from, {}, "tiny"));
     const name = document.createElement("span");
     name.textContent = m.from;
     const t = document.createElement("time");
@@ -313,9 +624,7 @@ function showEmpty(on) {
   el.composer.hidden = on;
   el.head.hidden = on;
   if (on) {
-    el.members.hidden = true;
-    // Your name is the name you took in a room, so with no rooms there is
-    // none to show — only which build this is.
+    togglePane(false);
     el.meAvatar.style.visibility = "hidden"; // keep the slot, lose the disc
     el.meName.textContent = "Not in a room";
   } else {
@@ -388,7 +697,12 @@ $("join-form").addEventListener("submit", async (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !el.modal.hidden) closeJoin();
+  if (e.key === "Escape") {
+    if (!el.pop.hidden) return closePop();
+    if (!el.menu.hidden) return closeMenu();
+    if (!el.modal.hidden) return closeJoin();
+    if (paneOpen) return togglePane(false);
+  }
   // ⌘N is what every chat app uses for "new conversation", and there is no
   // menu bar item competing for it here.
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "n") {
@@ -401,35 +715,38 @@ document.addEventListener("keydown", (e) => {
     el.search.focus();
     el.search.select();
   }
+  // ⌘I opens the settings pane, the way ⌘I opens an inspector everywhere else.
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "i") {
+    e.preventDefault();
+    if (activeId) togglePane();
+  }
 });
 
 // -------------------------------------------------------------- odds/ends
 
+async function copy(text, said) {
+  if (!text) return;
+  try {
+    await call("Copy", text);
+    toast(said);
+  } catch (err) {
+    oops(err);
+  }
+}
+
+const oops = (err) => toast(String(err));
+
 let toastTimer = null;
 function toast(text) {
-  el.toast.textContent = text.replace(/^Error:\s*/, "");
+  el.toast.textContent = String(text).replace(/^Error:\s*/, "");
   el.toast.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.toast.hidden = true), 5000);
+  toastTimer = setTimeout(() => (el.toast.hidden = true), 4000);
 }
 
 // The kinds that are somebody talking, as opposed to the room reporting on
 // itself. proto has five; the other three read as notices.
 const SAID = new Set(["chat", "action"]);
-
-const PALETTE = ["#7FD1C0", "#E8785C", "#8FA9F5", "#F0C27B", "#C4A6E8", "#7FB2D1"];
-
-function avatar(name, size) {
-  const a = document.createElement("span");
-  a.className = "avatar" + (size ? " " + size : "");
-  return paint(a, name);
-}
-
-function hash(s) {
-  let h = 0;
-  for (let i = 0; i < (s || "").length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return h;
-}
 
 function clock(d) {
   return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -454,6 +771,11 @@ function shortWhen(d) {
   if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
   if (now - d < 7 * 24 * 60 * 60 * 1000) return d.toLocaleDateString([], { weekday: "short" });
   return d.toLocaleDateString([], { month: "numeric", day: "numeric", year: "2-digit" });
+}
+
+// short is a server URL with the parts nobody reads taken off.
+function short(server) {
+  return (server || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
 }
 
 boot().catch((err) => toast(String(err)));

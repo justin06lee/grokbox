@@ -85,6 +85,17 @@ type RoomView struct {
 	Last      *proto.Message `json:"last"`
 	History   []MessageView  `json:"history"`
 	Members   []proto.Member `json:"members"`
+
+	// Everything below is app.json's, not the protocol's: how the room looks
+	// in this window and whether it may interrupt you. Title is Room unless
+	// you have renamed it here.
+	Title    string `json:"title"`
+	Shape    string `json:"shape"`
+	Color    string `json:"color"`
+	Photo    string `json:"photo"`
+	Nickname string `json:"nickname"`
+	Hidden   bool   `json:"hidden"`
+	Quiet    bool   `json:"quiet"`
 }
 
 // MessageView is a message with the two things the window would otherwise
@@ -126,6 +137,9 @@ type Manager struct {
 
 	cfgMu sync.Mutex // one writer at a time for client.json
 
+	prefsMu sync.Mutex // and one for app.json
+	prefs   Prefs
+
 	// notesOK is whether the OS has actually granted this build the right to
 	// notify. It has to be asked, not assumed: an ad-hoc signed bundle is
 	// refused, and SendNotification then swallows the message rather than
@@ -137,9 +151,21 @@ type Manager struct {
 func (m *Manager) AllowNotifications(ok bool) { m.notesOK.Store(ok) }
 
 func NewManager() *Manager {
-	m := &Manager{}
+	m := &Manager{prefs: loadPrefs()}
 	m.ctx, m.cancel = context.WithCancel(context.Background())
 	return m
+}
+
+// dress puts app.json's opinions onto a room the protocol just described.
+func (m *Manager) dress(v RoomView) RoomView {
+	rp := m.prefsFor(v.ID)
+	v.Shape, v.Color, v.Nickname = rp.Shape, rp.Color, rp.Nickname
+	v.Photo, v.Hidden, v.Quiet = dataURL(rp.Photo), rp.Hidden, rp.Quiet
+	v.Title = v.Room
+	if rp.Nickname != "" {
+		v.Title = rp.Nickname
+	}
+	return v
 }
 
 func (m *Manager) attach(app *application.App, notes *notifications.NotificationService, dk *dock.DockService) {
@@ -284,7 +310,7 @@ func (m *Manager) arrived(r *Room, msg proto.Message) {
 	m.publish(r)
 	m.save(r)
 
-	if mention && !watching {
+	if mention && !watching && !m.prefsFor(r.ID).Quiet {
 		m.notify(r, msg)
 	}
 }
@@ -346,7 +372,7 @@ func (m *Manager) List() []RoomView {
 
 	out := make([]RoomView, 0, len(rooms))
 	for _, r := range rooms {
-		out = append(out, r.snapshot(false))
+		out = append(out, m.dress(r.snapshot(false)))
 	}
 	return out
 }
@@ -445,7 +471,7 @@ func (m *Manager) Open(id string) (RoomView, error) {
 	r.mu.Unlock()
 	m.badge()
 	m.app.Event.Emit("grokbox:rooms", m.List())
-	return r.snapshot(true), nil
+	return m.dress(r.snapshot(true)), nil
 }
 
 // Send says something in a room.
@@ -506,7 +532,7 @@ func (m *Manager) Join(invite, name string) (RoomView, error) {
 	// second time would show everyone a join, a leave and a join.
 	r := m.adopt(p, cl, resp)
 	m.app.Event.Emit("grokbox:rooms", m.List())
-	return r.snapshot(false), nil
+	return m.dress(r.snapshot(false)), nil
 }
 
 // Leave ends the membership and forgets the room.
@@ -536,9 +562,44 @@ func (m *Manager) Leave(id string) error {
 	m.mu.Unlock()
 
 	m.forget(r)
+	m.forgetPrefs(id)
 	m.app.Event.Emit("grokbox:rooms", m.List())
 	m.badge()
 	return nil
+}
+
+// MarkUnread puts a room back in the state it was in before you read it, so
+// you come back to it. The count is one because the point is the mark, not an
+// accurate replay of how much you had missed.
+func (m *Manager) MarkUnread(id string) error {
+	r := m.find(id)
+	if r == nil {
+		return errors.New("no such room")
+	}
+	m.mu.Lock()
+	if m.active == id {
+		m.active = ""
+	}
+	m.mu.Unlock()
+	r.mu.Lock()
+	if r.unread == 0 {
+		r.unread = 1
+	}
+	r.mu.Unlock()
+	m.badge()
+	m.app.Event.Emit("grokbox:rooms", m.List())
+	return nil
+}
+
+// InviteCode is the string that gets somebody else into this room. It is
+// rebuilt from the live client rather than read back off disk, so it carries
+// whatever certificate the room is actually pinned to right now.
+func (m *Manager) InviteCode(id string) (string, error) {
+	r := m.find(id)
+	if r == nil {
+		return "", errors.New("no such room")
+	}
+	return r.cl.Invite().String(), nil
 }
 
 // SetFocus records whether the window is in front. A message that arrives

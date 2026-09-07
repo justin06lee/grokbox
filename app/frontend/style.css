@@ -34,6 +34,10 @@
   --fill-composer: #fcfcfc;
   --fill-accent-subtle: #1084fe17;
   --fill-danger-subtle: #ff263c17;
+  --fill-danger-subtle-hover: #ff263c2b;
+  --fill-control-track: #1414141a;
+  --fill-control-checked: #070707;
+  --switch-knob: #fcfcfc;
 
   /* --sand-border-* */
   --border: #14141426;
@@ -41,6 +45,7 @@
   --border-accent: #459ffe;
   --border-accent-subtle: #1084fe2b;
   --border-focus: #0c64c1;
+  --border-strong: #1414144d;
 
   --text-accent: #0c64c1;
   --text-danger: #c21d2e;
@@ -86,9 +91,14 @@
     --fill-composer: #2f2f2f;
     --fill-accent-subtle: #1084fe2b;
     --fill-danger-subtle: #ff263c2b;
+    --fill-danger-subtle-hover: #ff263c3d;
+    --fill-control-track: #ffffff26;
+    --fill-control-checked: #fcfcfc;
+    --switch-knob: #141414;
 
     --border: #ffffff1f;
     --border-weak: #ffffff14;
+    --border-strong: #ffffff4d;
 
     --text-accent: #6db4fe;
     --text-danger: #ff5667;
@@ -227,19 +237,22 @@ button { font: inherit; color: inherit; }
 .room:hover { background: var(--fill-ghost-hover); }
 .room.active { background: var(--fill-ghost-selected); }
 
+/* An avatar is a coloured shape with two eyes, drawn by avatar.js — the same
+   eight silhouettes and eleven colours Grok Bot dresses its bots in. The shape
+   is its own outline, so it is not clipped to a circle; a photo is. */
 .avatar {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-weight: 600;
-  font-size: 13px;
-  color: #14141a;
   flex: 0 0 auto;
+  display: block;
+  line-height: 0;
 }
-.avatar.small { width: 18px; height: 18px; font-size: 9px; }
-.avatar.tiny { width: 16px; height: 16px; font-size: 8px; }
+.avatar svg, .avatar img { width: 100%; height: 100%; display: block; }
+.avatar img { border-radius: 50%; object-fit: cover; }
+.avatar.tiny { width: 16px; height: 16px; }
+.avatar.small { width: 18px; height: 18px; }
+.avatar.big { width: 30px; height: 30px; }
+.avatar.huge { width: 76px; height: 76px; }
 
 .room-text { min-width: 0; display: block; }
 
@@ -310,8 +323,6 @@ button { font: inherit; color: inherit; }
   transition: background .1s ease;
 }
 .foot-row:hover { background: var(--fill-ghost-hover); }
-.foot-row.static { cursor: default; }
-.foot-row.static:hover { background: transparent; }
 .foot-row svg { color: var(--text-secondary); flex: 0 0 auto; }
 .foot-who { min-width: 0; }
 .foot-who b { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -526,34 +537,6 @@ button { font: inherit; color: inherit; }
 }
 .composer textarea::placeholder { color: var(--text-secondary); }
 
-/* ------------------------------------------------------------- members */
-
-.members {
-  width: 230px;
-  background: var(--bg-subtle);
-  overflow-y: auto;
-  padding-bottom: 12px;
-}
-.members-head {
-  height: var(--titlebar);
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  font-size: 13px;
-  font-weight: 500;
-  --wails-draggable: drag;
-}
-.members ul { list-style: none; margin: 0; padding: 0 12px; }
-.members li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
-  border-radius: 10px;
-  font-size: 13px;
-}
-.members li .you { margin-left: auto; color: var(--text-secondary); font-size: 12px; }
-
 /* --------------------------------------------------------------- empty */
 
 .empty {
@@ -582,54 +565,40 @@ button { font: inherit; color: inherit; }
 }
 .modal[hidden] { display: none; }
 
+/* The Marketplace panel's proportions: a big title, a lot of air, fields that
+   are soft filled rectangles rather than outlined ones, and pill buttons. */
 .sheet {
-  width: 460px;
+  width: 520px;
   max-width: calc(100vw - 48px);
   background: var(--bg-elevated);
-  border-radius: 16px;
+  border-radius: 18px;
   box-shadow: var(--shadow-modal);
-  padding: 24px;
+  padding: 26px 28px 24px;
   display: flex;
   flex-direction: column;
-  position: relative;
 }
-.sheet h2 { margin: 0 0 4px; font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
-.sheet-note { margin: 0 0 18px; color: var(--text-secondary); font-size: 13px; line-height: 1.45; }
-.sheet-close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-}
-
-/* Grok Bot groups every setting into one soft card with hairline dividers. */
-.field-group {
-  background: var(--fill-secondary);
+.sheet-head { display: flex; align-items: flex-start; gap: 12px; }
+.sheet h2 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+.sheet-head .icon-btn { margin-left: auto; margin-top: 1px; }
+.sheet-note { margin: 7px 0 24px; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+.sheet-label { display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin: 0 0 7px; }
+.sheet-field {
+  width: 100%;
+  border: 0;
   border-radius: 12px;
-  padding: 4px 14px;
-}
-.field {
-  padding: 12px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.field + .field { border-top: 1px solid var(--border-weak); }
-.field label { font-size: 13px; font-weight: 500; }
-.field textarea, .field input {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-elevated);
+  background: var(--fill-secondary);
   color: var(--text);
-  padding: 8px 10px;
+  padding: 12px 14px;
   font: inherit;
   font-size: 13px;
-  resize: none;
   outline: none;
+  resize: none;
+  margin-bottom: 18px;
   user-select: text;
   -webkit-user-select: text;
 }
-.field textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; line-height: 1.5; }
-.field textarea:focus, .field input:focus { border-color: var(--border-focus); }
+.sheet-field::placeholder { color: var(--text-secondary); }
+.sheet-field:focus { box-shadow: inset 0 0 0 1px var(--border-focus); }
 
 .sheet-error {
   margin: 12px 0 0;
@@ -668,3 +637,243 @@ button { font: inherit; color: inherit; }
   background-clip: padding-box;
 }
 :hover::-webkit-scrollbar-thumb { background: var(--fill-ghost-selected); background-clip: padding-box; }
+
+/* ---------------------------------------------------------- settings pane
+
+   Grok Bot calls this the info pane and keeps it at the right of the window;
+   its own layout file remembers `infoPane.width`, so it is a panel that stays
+   rather than a sheet that interrupts. */
+
+.pane {
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-subtle);
+}
+
+.pane-head {
+  height: var(--titlebar);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 0 12px 0 20px;
+  --wails-draggable: drag;
+}
+.pane-title { font-size: 13px; font-weight: 500; }
+.pane-head .icon-btn { margin-left: auto; --wails-draggable: no-drag; }
+
+.pane-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 20px 24px;
+}
+
+.pane-avatar {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 18px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.pane-avatar-hint { font-size: 12px; color: var(--text-secondary); }
+.pane-avatar:hover .pane-avatar-hint { color: var(--text); }
+
+.pane-label {
+  display: block;
+  margin: 16px 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.pane-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  resize: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.pane-input:focus { border-color: var(--border-focus); }
+.pane-input[readonly] {
+  background: var(--fill-secondary);
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11.5px; line-height: 1.5; }
+.pane-help { margin: 6px 0 0; font-size: 11.5px; color: var(--text-secondary); overflow-wrap: anywhere; }
+
+/* The invite code fills its box, so Copy goes up beside the label rather than
+   floating over the last line of it. */
+.pane-label-row { display: flex; align-items: center; gap: 10px; margin: 16px 0 6px; }
+.pane-label-row .pane-label { margin: 0; }
+.pane-label-row .ghost-btn { margin-left: auto; }
+.ghost-btn.small { padding: 3px 11px; font-size: 12px; }
+
+.pane-switch {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 22px;
+  padding: 13px 14px;
+  border-radius: 12px;
+  background: var(--fill-secondary);
+}
+.pane-switch-text { min-width: 0; }
+.pane-switch-text b { display: block; font-size: 13px; font-weight: 500; }
+.pane-switch-text span { display: block; margin-top: 2px; font-size: 12px; color: var(--text-secondary); }
+
+.switch { position: relative; flex: 0 0 auto; margin-left: auto; width: 40px; height: 24px; }
+.switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.switch span {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--fill-control-track);
+  transition: background .15s ease;
+  pointer-events: none;
+}
+.switch span::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fcfcfc;
+  box-shadow: var(--shadow-control);
+  transition: transform .15s ease, background .15s ease;
+}
+.switch input:checked + span { background: var(--fill-control-checked); }
+.switch input:checked + span::after { transform: translateX(16px); background: var(--switch-knob); }
+
+.pane-section { margin: 26px 0 6px; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.member-list { list-style: none; margin: 0; padding: 0; }
+.member-list li { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 13px; }
+.member-list li .you { margin-left: auto; color: var(--text-secondary); font-size: 12px; }
+
+.danger-btn {
+  width: 100%;
+  margin-top: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fill-danger-subtle);
+  color: var(--text-danger);
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .1s ease;
+}
+.danger-btn:hover { background: var(--fill-danger-subtle-hover); }
+
+/* --------------------------------------------------------- context menu */
+
+.menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 236px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-weak);
+  box-shadow: var(--shadow-popover);
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.menu-item:hover { background: var(--fill-ghost-hover); }
+.menu-item svg { flex: 0 0 auto; color: var(--text-secondary); }
+.menu-item.danger, .menu-item.danger svg { color: var(--text-danger); }
+.menu-sep { height: 1px; margin: 5px 8px; background: var(--border-weak); }
+
+/* ---------------------------------------------------------- avatar picker
+
+   Grok Bot's is a popover under the avatar: four tabs, eight shapes, eleven
+   colours. Generate makes a picture with a model, which this has no use for,
+   so that slot is Shuffle. */
+
+.pop {
+  position: fixed;
+  z-index: 61;
+  width: 296px;
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-weak);
+  box-shadow: var(--shadow-popover);
+  overflow: hidden;
+}
+.pop-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border-weak);
+}
+.pop-tab {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .1s ease, color .1s ease;
+}
+.pop-tab:hover { background: var(--fill-ghost-hover); color: var(--text); }
+.pop-tab.on { background: var(--fill-secondary-solid); color: var(--text); }
+.pop-tab.reset { margin-left: auto; }
+
+.pop-body { padding: 12px; }
+.pop-shapes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.pop-shape {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+.pop-shape:hover { background: var(--fill-ghost-hover); }
+.pop-shape.on { box-shadow: inset 0 0 0 1.5px var(--border); }
+.pop-shape svg { width: 100%; height: 100%; display: block; }
+
+.pop-colors {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  place-items: center;
+  margin-top: 14px;
+}
+.pop-color { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; }
+.pop-color.on { box-shadow: 0 0 0 2px var(--bg-elevated), 0 0 0 3.5px var(--border-strong); }
+
+/* --------------------------------------------------------------- hidden */
+
+.room.dimmed { opacity: .55; }
