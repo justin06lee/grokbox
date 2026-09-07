@@ -6,8 +6,8 @@
 // composer, a settings pane on the right, and a right-click menu on a room.
 // style.css records where each measurement came from.
 
-import { Call, Events } from "/wails/runtime.js";
-import * as Avatar from "/avatar.js";
+import { Call, Events } from "./runtime.js";
+import * as Avatar from "./avatar.js";
 
 const call = (method, ...args) => Call.ByName("main.API." + method, ...args);
 

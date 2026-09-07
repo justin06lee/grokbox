@@ -366,6 +366,24 @@ To have it running whenever you are logged in, on macOS:
 launchctl load ~/Library/LaunchAgents/sh.grokbox.notify.plist
 ```
 
+## Peer room demo
+
+`make demo` creates **dist/Grok Box Demo.html**, a single offline file you can
+open in a browser. It uses the actual desktop app’s markup, stylesheet,
+avatars, message renderer, composer, and settings. No presentation controls
+or demo labels appear inside the window.
+
+The Project 2 room opens as Justin. His navi and Maya’s navi automatically
+negotiate a study session, agreeing on **3:30–4:45 PM**. Reply `yes` to the
+calendar question. Send `start` to replay, or `plan with maya` to start another
+negotiation. Room preferences and messages live only in memory. All bot
+responses and calendar acknowledgments are scripted; no real messages or
+calendar events are sent.
+
+`make app-demo` also builds **app/bin/Grok Box Demo.app** on macOS, with the
+same native window as Grok Box. Alternatively, `make app-build` and run
+`app/bin/grokbox --demo`. Both paths keep real saved rooms untouched.
+
 ## The desktop app
 
 The terminal covers reading a room and being told when you are named. What it

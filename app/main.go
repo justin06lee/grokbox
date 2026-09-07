@@ -37,6 +37,9 @@ const bundleID = "com.grokbox.app"
 // version is stamped at build time by the Makefile.
 var version = ""
 
+// demoMode is set only in the dedicated presentation build.
+var demoMode = ""
+
 func resolveVersion() string {
 	if version != "" {
 		return version
@@ -53,6 +56,16 @@ func resolveVersion() string {
 
 func main() {
 	version = resolveVersion()
+	if demoMode == "1" {
+		runDemo()
+		return
+	}
+	for _, arg := range os.Args[1:] {
+		if arg == "--demo" {
+			runDemo()
+			return
+		}
+	}
 
 	rooms := NewManager()
 	notes := notifications.New()
@@ -166,6 +179,28 @@ func main() {
 
 	if err := app.Run(); err != nil {
 		log.Println("grokbox:", err)
+		os.Exit(1)
+	}
+}
+
+// runDemo keeps the presentation separate from saved rooms, notifications and
+// bot webhooks. It can run beside the real app without joining any rooms.
+func runDemo() {
+	app := application.New(application.Options{
+		Name:        "Grok Box",
+		Description: "A scripted peer-room conversation.",
+		Icon:        appIcon,
+		Assets:      application.AssetOptions{Handler: application.BundledAssetFileServer(assets)},
+		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
+	})
+	app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name: "main", Title: "Grok Box", Width: 1080, Height: 720,
+		MinWidth: 720, MinHeight: 460, URL: "/?demo=1",
+		Mac:              application.MacWindow{TitleBar: application.MacTitleBarHiddenInset, InvisibleTitleBarHeight: 48},
+		BackgroundColour: application.NewRGB(252, 252, 252),
+	})
+	if err := app.Run(); err != nil {
+		log.Println("grokbox demo:", err)
 		os.Exit(1)
 	}
 }
