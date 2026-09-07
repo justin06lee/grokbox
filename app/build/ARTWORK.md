@@ -31,28 +31,22 @@ The original generated exterior contained a painted checkerboard, so the
 production source uses opaque full-bleed artwork. Transparency and icon
 geometry are supplied by the SVG wrapper, independently of generation.
 
-## Current expressions and silhouettes
+## Current artwork
 
-Blue's closed wink and green's two happy eyes are wide, plump curved beans
-with rounded ends and a shallow lower notch. Red has matching bean slots
-at opposite diagonal tilts. Blue's open eye and silver's two eyes keep the
-original shape. The round silhouettes, bubble placement, outer mask, and
-100-pixel inset are unchanged.
+Green's happy bean eyes are larger for readability at Dock sizes. Blue keeps
+its rounded wink, red keeps the matched diagonal beans, and silver keeps its
+original eyes. Shadows are slightly softer, and the speech bubble sits farther
+up and left with more clearance from the tile's right edge. The spherical
+silhouettes, outer mask, and 100-pixel transparent inset are unchanged.
 
-## Latest edit prompts
+## Latest edit prompt
 
-Built-in imagegen, using the previous full-bleed artwork and the user's
-annotated screenshot. The second edit refines the red eye rotation.
+Built-in imagegen edit using the previous full-bleed artwork and the user's
+Dock screenshot showing the crowded speech bubble.
 
-> Precise eye-shape edit. Image 1 is the current full-bleed production artwork. Image 2 is the user's annotated screenshot: painted shapes and arrows are instructions ONLY and must not appear in the final image. Change ONLY the five eye shapes specified below, keeping the rest of image 1 pixel-faithful: the four spherical bodies, silhouettes, placement, silver buddy and both of its eyes, blue's open right eye, colors, speech bubble, backdrop, lighting and framing.
->
-> GREEN: replace its two pointed chevron-shaped closed eyes with two matching plump curved BEAN / crescent shapes following the two cream-colored shapes drawn above the head in image 2. The cream is just sketch ink: the actual eyes must remain BLACK recessed sockets. These are low, wide happy closed-eye arches, with a smooth convex domed top, a very shallow concave lower edge, fat rounded ends, and absolutely NO sharp ^ peak or deep V notch. Each eye should be roughly twice as wide as tall; both are identical in size and thickness, projected naturally onto the green sphere at the existing eye positions. A soft rounded upside-down smile, like a chunky kidney bean rotated horizontally. No extra eyebrows or eyes.
->
-> BLUE: make only its closed left wink a matching plump horizontal happy bean with a gently domed upper edge and a shallow concave lower edge, as the black shape drawn over blue's eye in image 2 indicates. Thicker and fuller than the existing thin slit. Keep the open right eye unchanged.
->
-> RED: make its two eyes an EXACT MATCH in unrotated shape, length, width, end radius and thickness: a pair of rounded bean-shaped black inset eye slots from the same shape family as blue's open eye and silver's eyes, with only a subtle organic bean curvature. They should not look like one wide eye and one narrow eye. Rotate the LEFT bean about +45 degrees from vertical so it reads /, and the RIGHT bean about -45 degrees from vertical so it reads backslash. Equal and opposite diagonal tilt, symmetric angles, same size. Preserve their existing centers and the red sphere's overall face placement. Softly rounded ends, no pointed corners.
->
-> Match the existing sculpted ceramic finish and subtle rim highlights around all edited sockets. Keep all eyes BLACK. Do NOT include the cream guide shapes above green, any arrows, handwriting, labels, mouths or new objects.
-> OUTPUT: same full-bleed OPAQUE SQUARE texture as image 1, with charcoal filling the top corners and foreground spheres cropped by the bottom canvas edge. NO rounded outer tile, margin, padding, transparency, checkerboard, border or mockup; our build script applies the native macOS mask and transparent padding.
-
-> Edit exactly ONE shape: the RIGHTMOST black eye on the RED sphere in the lower-right corner. Rotate that eye COUNTERCLOCKWISE by an additional 25 degrees around its center. Its long axis should go from upper-left to lower-right at a strong 45-degree diagonal, like the descending arm of an upside-down V. It must be the mirror-angle counterpart of red's left eye, which slopes the other way. The current right eye is too upright. Make the two red eye sockets equally long and equally thick, rounded capsule/bean shapes. Do not move their centers. This is a visible geometric rotation, not a tiny adjustment. Leave every other pixel of the supplied artwork unchanged. Preserve all other eyes, spheres, shading, speech bubble, full-bleed square format, and colors. No added borders, annotations, texture or framing.
+> Precise production app-icon edit of image 1. Image 2 is the user's small Dock screenshot showing that the speech bubble is crowded against the outer right corner. Make ONLY these three refinements:
+> 1. Enlarge BOTH GREEN happy bean eyes by about 30 percent in width and height, scaling each about its existing center. Keep their plump low curved arch/bean shape, rounded ends and shallow concave bottom; do not turn them into sharp chevrons, eyebrows or open pill eyes. They must be noticeably bigger and equally sized, readable at small Dock sizes.
+> 2. Move the ENTIRE ivory speech bubble LEFT by about 110 pixels and UP by about 25 pixels on this 1254x1254 texture. Current bubble spans roughly x=900..1195, y=108..365 including tail. Target spans roughly x=790..1085, y=83..340. Preserve its current size, rounded shape, exactly three black dots, and short down-left tail. The important change is a broad dark charcoal gap to the RIGHT of the bubble, so it sits comfortably inside the icon's upper-right corner rather than hugging it. Do not enlarge the bubble or move it closer to the right edge. Our outer mask is applied later.
+> 3. Reduce shadow intensity just a little, around 15 to 20 percent: soften the cast shadow under the bubble and dark contact shadows between buddies, and lift the deepest body shading slightly. Retain the three-dimensional spherical ceramic finish, saturated blue/green/coral colors, pearl silver foreground buddy, fine highlights and recessed black eyes. Avoid flat vector shading, washed-out colors, or added texture.
+> Preserve ALL other features: positions and round silhouettes of the four buddies, blue wink and open eye, red's matching diagonally opposed bean slots, white buddy's eyes, charcoal background, and the overall composition.
+> OUTPUT remains the same FULL-BLEED OPAQUE SQUARE artwork texture. Charcoal fills the top corners, foreground spheres extend through the bottom canvas edge. No outer rounded icon frame, no extra margin or transparent padding, no checkerboard, no border, no text, arrows or new objects.
