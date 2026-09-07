@@ -80,9 +80,7 @@ func (a *API) Copy(text string) error {
 func (a *API) SetAvatar(id, shape, color string) error {
 	return a.m.editRoom(id, func(p *RoomPrefs) {
 		p.Shape, p.Color = shape, color
-		if shape != "" || color != "" {
-			p.Photo = "" // a picture and a shape cannot both be the avatar
-		}
+		p.Photo = "" // Reset must also clear an uploaded picture.
 	})
 }
 
@@ -161,7 +159,7 @@ func (a *API) SetGitHub(login string) error {
 	return a.m.fetchPhoto(strings.TrimSpace(login))
 }
 
-// ClearProfile puts you back to a plain coloured disc with your initial on it.
+// ClearProfile restores the bot shape and colour derived from your name.
 func (a *API) ClearProfile() error {
 	return a.m.editProfile(func(p *ProfilePrefs) { *p = ProfilePrefs{} })
 }

@@ -391,8 +391,12 @@ shapes and one of eleven colours; `app/frontend/avatar.js` draws the same eight
 palette. A room you have not dressed gets a shape and a colour hashed from its
 name, so it looks the same on every machine that joins it. Click the picture in
 the settings pane, or right-click the room and pick **Change picture**, to
-choose: Bot for the grid, Shuffle for a random pair, Upload for a file of your
-own, Reset to go back to the derived one.
+choose: Bot for the grid, Generate for a random bot shape and colour (local,
+no image service), Upload for a file of your own, Reset to clear the picture
+and go back to the derived one. The picker uses saturated colours, tilted dark
+eyes, and a selection outline that follows the shape. The neutral swatch is
+white in dark mode and charcoal in light mode. Choices save immediately;
+Escape closes the picker and returns focus to its button.
 
 **Your own picture comes from GitHub.** Grok Bot signs in through GitHub and
 keeps the avatar's URL sealed in an encrypted store, so instead of prising that

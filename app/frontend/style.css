@@ -671,18 +671,33 @@ button { font: inherit; color: inherit; }
 }
 
 .pane-avatar {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0 18px;
+  position: relative;
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  margin: 4px auto 20px;
+  padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
+  --avatar-surface: var(--bg-subtle);
 }
-.pane-avatar-hint { font-size: 12px; color: var(--text-secondary); }
-.pane-avatar:hover .pane-avatar-hint { color: var(--text); }
+.pane-avatar .avatar { width: 88px; height: 88px; }
+.pane-avatar-edit {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: white;
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+.pane-avatar:hover .pane-avatar-edit,
+.pane-avatar[aria-expanded="true"] .pane-avatar-edit,
+.pane-avatar:focus-visible .pane-avatar-edit { opacity: 1; }
+.pane-avatar:hover .avatar-contour,
+.pane-avatar[aria-expanded="true"] .avatar-contour { visibility: visible; }
 
 .pane-label {
   display: block;
@@ -810,69 +825,93 @@ button { font: inherit; color: inherit; }
 .menu-item.danger, .menu-item.danger svg { color: var(--text-danger); }
 .menu-sep { height: 1px; margin: 5px 8px; background: var(--border-weak); }
 
-/* ---------------------------------------------------------- avatar picker
-
-   Grok Bot's is a popover under the avatar: four tabs, eight shapes, eleven
-   colours. Generate makes a picture with a model, which this has no use for,
-   so that slot is Shuffle. */
-
+/* ---------------------------------------------------------- avatar picker */
+:root {
+  --avatar-neutral: #191919;
+  --avatar-eyes: #151515;
+  --avatar-outline: #bcbcbc;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --avatar-neutral: #fff;
+    --avatar-outline: #454545;
+  }
+}
+.avatar-contour { visibility: hidden; }
+/* The neutral bot needs contrasting eyes in either appearance. */
+svg:has(path[fill="var(--avatar-neutral)"]) { --avatar-eyes: var(--bg); }
 .pop {
   position: fixed;
   z-index: 61;
-  width: 296px;
-  border-radius: 14px;
+  width: 294px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  border-radius: 17px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-weak);
   box-shadow: var(--shadow-popover);
-  overflow: hidden;
+  overflow: auto;
 }
 .pop-tabs {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   padding: 8px;
   border-bottom: 1px solid var(--border-weak);
 }
 .pop-tab {
   border: 0;
-  border-radius: 8px;
+  border-radius: 9px;
   background: transparent;
   color: var(--text-secondary);
-  padding: 6px 10px;
+  padding: 6px 8px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
   cursor: pointer;
-  transition: background .1s ease, color .1s ease;
 }
 .pop-tab:hover { background: var(--fill-ghost-hover); color: var(--text); }
 .pop-tab.on { background: var(--fill-secondary-solid); color: var(--text); }
 .pop-tab.reset { margin-left: auto; }
-
-.pop-body { padding: 12px; }
-.pop-shapes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.pop-body { padding: 18px 30px 24px; }
+.pop-shapes { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 14px; row-gap: 15px; }
 .pop-shape {
-  aspect-ratio: 1;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
-  padding: 12px;
+  justify-self: center;
+  padding: 0;
   border: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   background: transparent;
   cursor: pointer;
 }
 .pop-shape:hover { background: var(--fill-ghost-hover); }
-.pop-shape.on { box-shadow: inset 0 0 0 1.5px var(--border); }
+.pop-shape.on .avatar-contour { visibility: visible; }
 .pop-shape svg { width: 100%; height: 100%; display: block; }
-
 .pop-colors {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 10px;
-  place-items: center;
-  margin-top: 14px;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  justify-items: center;
+  margin-top: 30px;
+  margin-left: 4px;
+  margin-right: 4px;
 }
-.pop-color { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; }
-.pop-color.on { box-shadow: 0 0 0 2px var(--bg-elevated), 0 0 0 3.5px var(--border-strong); }
+.pop-color {
+  grid-column: span 2;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.pop-color:nth-child(7) { grid-column: 2 / span 2; }
+.pop-color.on { box-shadow: 0 0 0 3px var(--bg-elevated), 0 0 0 4px var(--avatar-outline); }
+.pop-color:hover { outline: 1px solid var(--avatar-outline); outline-offset: 3px; }
+.pop button:focus-visible { outline: 2px solid var(--text-secondary); outline-offset: 3px; }
+.pop[aria-busy="true"] button { cursor: progress; }
 
 /* --------------------------------------------------------------- hidden */
 

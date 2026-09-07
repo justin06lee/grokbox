@@ -6,70 +6,29 @@
 // beside them). Grok Bot generates its silhouettes procedurally; these are
 // drawn by hand to the same outlines.
 //
-// The colours are its token values with the chroma taken down to 78% in OKLCH,
-// which is the transform that turns the raw #00BCA6 in its source into the
-// #5cc0b0 that actually appears on screen. Sampled from three of its avatars,
-// consistent to a rounding error.
-
+// Palette and silhouettes match the picker reference. The neutral swatch
+// follows the system theme; legacy saved "black" choices remain supported.
 export const SHAPES = ["blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop"];
-
 export const COLORS = {
-  black: "#000000",
-  brown: "#906b4b",
-  red: "#ef5656",
-  orange: "#f27d48",
-  yellow: "#f6a654",
-  green: "#58c985",
-  cyan: "#54bdab",
-  blue: "#428cea",
-  violet: "#916de9",
-  magenta: "#f15b9f",
-  gray: "#7b7b7b",
+  white: "var(--avatar-neutral)", brown: "#855c34", red: "#e91b36",
+  orange: "#ff6900", yellow: "#ff9900", green: "#009e60",
+  cyan: "#00a995", blue: "#1079df", violet: "#824de0",
+  magenta: "#df2387", gray: "#7b7b7b", black: "#000000",
 };
+export const COLOR_ORDER = Object.keys(COLORS).filter((c) => c !== "black");
+const DERIVABLE = COLOR_ORDER.filter((c) => c !== "white");
 
-// The order the swatches sit in, which is the order Grok Bot lists them.
-export const COLOR_ORDER = Object.keys(COLORS);
-
-// Black is a fine thing to choose and a poor thing to be given, so the shape a
-// name lands on never picks it.
-const DERIVABLE = COLOR_ORDER.filter((c) => c !== "black");
-
-// Every path is drawn in a 100×100 box. `eyes` is where that shape wants its
-// face: the centre, and how far apart, since a wedge has less room at the top
-// than a tablet has in the middle.
+// A shared 100-unit canvas leaves room for the selection contour. Faces sit
+// slightly above and right of centre, with two rounded, tilted eyes.
 const ART = {
-  blob: {
-    d: "M50 4C74.5 4 96 24 96 49.5C96 75.5 75 96 50 96C24.5 96 4 75 4 50C4 24.5 25 4 50 4Z",
-    eyes: { y: 50, gap: 20, scale: 1 },
-  },
-  pebble: {
-    d: "M50 8C77 8 97 25 97 50C97 76 78 92 50 92C22 92 3 76 3 50C3 25 23 8 50 8Z",
-    eyes: { y: 50, gap: 20, scale: 0.96 },
-  },
-  squircle: {
-    d: "M50 2C87 2 98 13 98 50C98 87 87 98 50 98C13 98 2 87 2 50C2 13 13 2 50 2Z",
-    eyes: { y: 50, gap: 20, scale: 1 },
-  },
-  tablet: {
-    d: "M36 14H64A36 36 0 0 1 64 86H36A36 36 0 0 1 36 14Z",
-    eyes: { y: 50, gap: 20, scale: 0.94 },
-  },
-  wedge: {
-    d: "M50 7C55 7 59 9 61 13L93 74C97 82 92 93 83 93H17C8 93 3 82 7 74L39 13C41 9 45 7 50 7Z",
-    eyes: { y: 62, gap: 18, scale: 0.9 },
-  },
-  hex: {
-    d: "M43 6C47.5 3.5 52.5 3.5 57 6L85 22C89.5 24.6 92 28.9 92 34V66C92 71.1 89.5 75.4 85 78L57 94C52.5 96.5 47.5 96.5 43 94L15 78C10.5 75.4 8 71.1 8 66V34C8 28.9 10.5 24.6 15 22Z",
-    eyes: { y: 50, gap: 19, scale: 0.96 },
-  },
-  cloud: {
-    d: "M28 33C30 20 39 11 51 11C63 11 72 20 74 33C86 35 95 44 95 56C95 74 76 89 50 89C24 89 5 74 5 56C5 44 15 35 28 33Z",
-    eyes: { y: 56, gap: 19, scale: 0.92 },
-  },
-  teardrop: {
-    d: "M50 4C50 4 88 44 88 62C88 81 71 95 50 95C29 95 12 81 12 62C12 44 50 4 50 4Z",
-    eyes: { y: 62, gap: 19, scale: 0.95 },
-  },
+  blob: "M49 7C71 5 89 24 91 47C95 72 79 93 55 94C30 96 10 80 7 56C4 33 22 10 49 7Z",
+  pebble: "M56 10C74 6 88 23 93 44C100 66 90 83 71 89C49 98 19 84 9 68C-2 48 18 20 39 14C45 12 50 11 56 10Z",
+  squircle: "M49 10C82 10 90 13 91 44L90 68C89 86 84 91 63 91H37C14 91 10 85 10 64V38C10 16 16 10 49 10Z",
+  tablet: "M35 20H65C83 20 97 32 97 51C97 69 84 81 65 81H35C15 81 3 69 3 52C3 34 15 20 35 20Z",
+  wedge: "M43 12Q51 0 59 12L91 69Q102 88 82 89H18Q-1 89 10 69Z",
+  hex: "M43 6Q50 2 57 6L84 22Q91 26 91 34V67Q91 75 84 79L57 95Q50 99 43 95L16 79Q9 75 9 67V34Q9 26 16 22Z",
+  cloud: "M17 37C15 13 42 1 59 17C78 7 94 26 87 44C107 62 94 84 75 80C62 97 42 90 35 81C11 89-5 66 7 48Q11 41 17 37Z",
+  teardrop: "M44 7Q50-1 56 7L82 40C106 71 86 96 60 98C31 101 11 81 12 60C12 42 30 23 44 7Z",
 };
 
 // fnv1a is the hash Grok Bot uses to pick a bot's look from its name. Same
@@ -102,19 +61,16 @@ export function svg(name, look = {}) {
   const d = derive(name);
   const shape = ART[look.shape] ? look.shape : d.shape;
   const color = COLORS[look.color] ? look.color : d.color;
-  const art = ART[shape];
-  const { y, gap, scale } = art.eyes;
-  const w = 6.4 * scale;
-  const h = 14.5 * scale;
-  const eye = (cx) =>
-    `<rect x="${(cx - w / 2).toFixed(2)}" y="${(y - h / 2).toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" rx="${(w / 2).toFixed(2)}" fill="#fff"/>`;
-  return (
-    `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
-    `<path d="${art.d}" fill="${COLORS[color]}"/>` +
-    eye(50 - gap / 2) +
-    eye(50 + gap / 2) +
-    `</svg>`
-  );
+  const path = ART[shape];
+  const eyeColor = color === "black" ? "#fff" : "var(--avatar-eyes)";
+  const eye = (x, y) => `<rect x="${x}" y="${y}" width="7.5" height="16" rx="3.75" fill="${eyeColor}" transform="rotate(-18 ${x + 3.75} ${y + 8})"/>`;
+  const pointed = shape === "wedge" || shape === "teardrop";
+  return `<svg viewBox="-6 -6 112 112" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path class="avatar-contour" d="${path}" fill="none" stroke="var(--avatar-outline)" stroke-width="17" stroke-linejoin="round"/>
+    <path class="avatar-contour" d="${path}" fill="none" stroke="var(--avatar-surface, var(--bg-elevated))" stroke-width="11" stroke-linejoin="round"/>
+    <path d="${path}" fill="${COLORS[color]}"/>
+    ${eye(pointed ? 48 : 51, pointed ? 54 : 35)}${eye(shape === "cloud" ? 71 : pointed ? 72 : 77, pointed ? 50 : 31)}
+  </svg>`;
 }
 
 // paint fills an element with an avatar: a photo when there is one, the shape
