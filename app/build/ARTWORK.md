@@ -1,7 +1,7 @@
 # App icon artwork
 
 `icon-artwork.png` is the full-bleed source artwork: four sculpted bot buddies
-in pearl silver, jade green, blue, and coral, with an ivory speech bubble.
+in pearl silver, jade green, blue, and coral, against a charcoal background.
 It was created with the built-in imagegen tool using the user's group sketch
 and the installed Grok Bot icon as visual references.
 
@@ -35,18 +35,12 @@ geometry are supplied by the SVG wrapper, independently of generation.
 
 Green's happy bean eyes are larger for readability at Dock sizes. Blue keeps
 its rounded wink, red keeps the matched diagonal beans, and silver keeps its
-original eyes. Shadows are slightly softer, and the speech bubble sits farther
-up and left with more clearance from the tile's right edge. The spherical
+original eyes. Shadows are slightly softer. The speech bubble, its three dots,
+tail, and cast shadow have been removed, restoring the charcoal background. The spherical
 silhouettes, outer mask, and 100-pixel transparent inset are unchanged.
 
 ## Latest edit prompt
 
-Built-in imagegen edit using the previous full-bleed artwork and the user's
-Dock screenshot showing the crowded speech bubble.
+Built-in imagegen edit using the previous full-bleed artwork.
 
-> Precise production app-icon edit of image 1. Image 2 is the user's small Dock screenshot showing that the speech bubble is crowded against the outer right corner. Make ONLY these three refinements:
-> 1. Enlarge BOTH GREEN happy bean eyes by about 30 percent in width and height, scaling each about its existing center. Keep their plump low curved arch/bean shape, rounded ends and shallow concave bottom; do not turn them into sharp chevrons, eyebrows or open pill eyes. They must be noticeably bigger and equally sized, readable at small Dock sizes.
-> 2. Move the ENTIRE ivory speech bubble LEFT by about 110 pixels and UP by about 25 pixels on this 1254x1254 texture. Current bubble spans roughly x=900..1195, y=108..365 including tail. Target spans roughly x=790..1085, y=83..340. Preserve its current size, rounded shape, exactly three black dots, and short down-left tail. The important change is a broad dark charcoal gap to the RIGHT of the bubble, so it sits comfortably inside the icon's upper-right corner rather than hugging it. Do not enlarge the bubble or move it closer to the right edge. Our outer mask is applied later.
-> 3. Reduce shadow intensity just a little, around 15 to 20 percent: soften the cast shadow under the bubble and dark contact shadows between buddies, and lift the deepest body shading slightly. Retain the three-dimensional spherical ceramic finish, saturated blue/green/coral colors, pearl silver foreground buddy, fine highlights and recessed black eyes. Avoid flat vector shading, washed-out colors, or added texture.
-> Preserve ALL other features: positions and round silhouettes of the four buddies, blue wink and open eye, red's matching diagonally opposed bean slots, white buddy's eyes, charcoal background, and the overall composition.
-> OUTPUT remains the same FULL-BLEED OPAQUE SQUARE artwork texture. Charcoal fills the top corners, foreground spheres extend through the bottom canvas edge. No outer rounded icon frame, no extra margin or transparent padding, no checkerboard, no border, no text, arrows or new objects.
+> Use case: precise-object-edit. Edit target: the supplied Grok Box app icon artwork. Remove ONLY the entire ivory speech bubble in the upper right, including its three black dots, its tail, and its cast shadow. Seamlessly fill that area with the same surrounding dark charcoal textured background. Preserve all four bot buddies exactly: their positions, sizes, silhouettes, pearl silver, jade green, blue, coral colors, inset eyes and facial expressions, ceramic texture, highlights and shading. Preserve the original square full-bleed opaque composition and framing. Do not move or enlarge any characters. No bubble, dots, new objects, text, borders, added margins, outer rounded mask, transparency, or checkerboard. The only intended change is removal of the speech bubble and its shadow.

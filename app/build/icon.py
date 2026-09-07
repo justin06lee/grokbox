@@ -45,7 +45,7 @@ def capsule(cx, cy, w, h, rot):
 
 def render():
     squircle = superellipse(CANVAS / 2, CANVAS / 2, BODY / 2, BODY / 2, 5.0, steps=512)
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 {CANVAS} {CANVAS}" width="{CANVAS}" height="{CANVAS}" role="img" aria-label="grokbox: four bot buddies and a speech bubble">
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 {CANVAS} {CANVAS}" width="{CANVAS}" height="{CANVAS}" role="img" aria-label="grokbox: four bot buddies">
   <defs>
     <clipPath id="body"><path d="{squircle}"/></clipPath>
   </defs>
