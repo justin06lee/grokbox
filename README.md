@@ -45,11 +45,11 @@ The macOS desktop app is `grokbox-app-macos.zip`; it unzips to **Grok Box.app**
 binary inside the bundle and the bundle id all stay `grokbox`; only what the
 Finder puts under the icon is the name you read.
 
-To prepare a release, `make dist VERSION=v0.5.0` cross-compiles CLI binaries
-for macOS, Linux and Windows into `./dist`. Then `make app-dist VERSION=v0.5.0`
+To prepare a release, `make dist VERSION=v0.5.1` cross-compiles CLI binaries
+for macOS, Linux and Windows into `./dist`. Then `make app-dist VERSION=v0.5.1`
 builds the desktop downloads with the same version and current icon assets.
 Publish those files from the matching source tag with
-`gh release create v0.5.0 --verify-tag dist/*`. Release downloads are built
+`gh release create v0.5.1 --verify-tag dist/*`. Release downloads are built
 artifacts: pushing source or icon changes alone does not update them.
 
 ## Host a room
@@ -57,7 +57,7 @@ artifacts: pushing source or icon changes alone does not update them.
 ```console
 $ grokbox serve
 
-grokbox v0.4.0 — listening on :7777
+grokbox v0.5.1 — listening on :7777
 reachable at https://203.0.113.9:7777   (public — anyone with the invite can reach it)
 
   room    lounge
